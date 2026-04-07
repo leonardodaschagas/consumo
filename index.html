@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Auth Moderno</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', sans-serif;
+  }
+
+  body {
+    height: 100vh;
+    background: linear-gradient(135deg, #4f46e5, #9333ea);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .card {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(20px);
+    padding: 40px;
+    border-radius: 20px;
+    width: 320px;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    animation: fadeIn 0.8s ease;
+  }
+
+  h2 {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  input {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 10px;
+    outline: none;
+  }
+
+  button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 10px;
+    background: #fff;
+    color: #4f46e5;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+
+  button:hover {
+    background: #ddd;
+  }
+
+  .switch {
+    text-align: center;
+    margin-top: 15px;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.8;
+  }
+
+  .switch:hover {
+    opacity: 1;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px);}
+    to { opacity: 1; transform: translateY(0);}
+  }
+</style>
+</head>
+
+<body>
+
+<div class="card">
+  <h2 id="title">Login</h2>
+
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Senha">
+
+  <button onclick="handleAuth()">Entrar</button>
+
+  <div class="switch" onclick="toggleMode()">
+    Não tem conta? Cadastre-se
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = "https://srwhournhfadlwbixkxt.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_Dax00kNBagvtTLdIZWBPLA_qYlAQsfL";
+
+  const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let isLogin = true;
+
+  async function handleAuth() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    if (isLogin) {
+      const { error } = await client.auth.signInWithPassword({
+        email, password
+      });
+
+      if (error) alert(error.message);
+      else {
+        alert("Login feito!");
+        window.location.href = "menu.html";
+      }
+
+    } else {
+      const { error } = await client.auth.signUp({
+        email, password
+      });
+
+      if (error) alert(error.message);
+      else alert("Conta criada! Verifique seu email.");
+    }
+  }
+
+  function toggleMode() {
+    isLogin = !isLogin;
+
+    document.getElementById("title").innerText = isLogin ? "Login" : "Cadastro";
+    document.querySelector("button").innerText = isLogin ? "Entrar" : "Cadastrar";
+    document.querySelector(".switch").innerText = isLogin 
+      ? "Não tem conta? Cadastre-se" 
+      : "Já tem conta? Fazer login";
+  }
+</script>
+
+</body>
+</html>

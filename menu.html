@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Consumo Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #9333ea;
+            --accent: #10b981;
+            --warning: #fbbf24;
+            --danger: #ef4444;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+        body {
+            height: 100vh;
+            background: linear-gradient(135deg, #0f172a, #1e1b4b);
+            display: flex;
+            color: white;
+            overflow: hidden; /* Impede a rolagem do fundo */
+        }
+
+        /* BARRA LATERAL FIXA */
+        .sidebar {
+            width: 280px;
+            min-width: 280px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            padding: 30px 20px;
+            height: 100vh;
+        }
+
+        .sidebar h2 { margin-bottom: 40px; text-align: center; color: var(--accent); font-size: 1.5rem; }
+
+        .menu-item {
+            padding: 14px 18px;
+            margin-bottom: 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: rgba(255,255,255,0.6);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.1); color: white; }
+        .menu-item.active { border-left: 4px solid var(--accent); background: rgba(16, 185, 129, 0.1); }
+
+        /* ÁREA DE CONTEÚDO COM ROLAGEM */
+        .main-content { 
+            flex: 1; 
+            padding: 40px; 
+            overflow-y: auto; /* ATIVA A BARRA DE ROLAGEM AQUI */
+            height: 100vh;
+            background: rgba(0,0,0,0.2); 
+        }
+
+        /* Estilização da Barra de Rolagem */
+        .main-content::-webkit-scrollbar { width: 8px; }
+        .main-content::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        .main-content::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
+
+        .content-section { display: none; animation: slideUp 0.4s ease-out; }
+        .content-section.active { display: block; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card { background: var(--glass); padding: 25px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 25px; }
+        
+        .grid-inputs { 
+            display: grid; 
+            grid-template-columns: 2fr 1fr 0.8fr 1fr 1fr 1fr auto; 
+            gap: 10px; 
+            align-items: flex-end; 
+        }
+
+        input {
+            width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.3); color: white; outline: none;
+        }
+
+        button { cursor: pointer; border: none; border-radius: 10px; font-weight: bold; transition: 0.3s; }
+        .btn-add { background: var(--accent); color: white; height: 45px; width: 50px; font-size: 1.5rem; }
+        .logout-btn { margin-top: auto; background: var(--danger); color: white; padding: 12px; opacity: 0.8; }
+
+        .table-container { margin-top: 20px; border-radius: 15px; overflow: hidden; background: rgba(0,0,0,0.2); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: rgba(255,255,255,0.05); padding: 15px; text-align: left; font-size: 0.85rem; color: var(--accent); }
+        td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
+        .delete-btn { background: none; color: var(--danger); font-size: 1.2rem; }
+
+        #app { display: none; width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <nav class="sidebar">
+        <h2>Gestão de Consumo</h2>
+        <div class="menu-item active" onclick="switchTab('inicio', this)">🏠 Painel Geral</div>
+        <div class="menu-item" onclick="switchTab('simulador', this)">⚡ Minha Residência</div>
+        <div class="menu-item" onclick="switchTab('config', this)">⚙️ Configurações</div>
+        <button class="logout-btn" onclick="handleLogout()">Sair do Sistema</button>
+    </nav>
+
+    <main class="main-content">
+        <section id="sec-inicio" class="content-section active">
+            <h1>Bem-vindo, <span id="user-name" style="color: var(--accent);">...</span></h1>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px;">
+                <div class="card">
+                    <span style="opacity: 0.7;">Consumo Total (Mês)</span>
+                    <h2 id="resumo-kwh" style="font-size: 2.2rem; margin-top: 10px;">0.00 kWh</h2>
+                </div>
+                <div class="card">
+                    <span style="opacity: 0.7;">Custo Total (Mês)</span>
+                    <h2 id="resumo-preco" style="font-size: 2.2rem; color: var(--warning); margin-top: 10px;">R$ 0,00</h2>
+                </div>
+                <div class="card" id="card-clima">
+                    <span style="opacity: 0.7;">Clima Externo (<span id="txt-cidade">--</span>)</span>
+                    <h2 id="temp-valor" style="font-size: 2.2rem; color: var(--accent); margin-top: 10px;">--°C</h2>
+                    <p id="temp-desc" style="text-transform: capitalize; font-size: 0.9rem; opacity: 0.8;">Carregando...</p>
+                </div>
+            </div>
+        
+            <div id="alerta-sos" class="card" style="margin-top: 20px; border-left: 5px solid var(--accent); display: none;">
+                <h3 style="color: var(--accent);">💡 Sugestão do Sistema</h3>
+                <p id="msg-sos" style="margin-top: 5px; opacity: 0.9;"></p>
+            </div>
+        </section>
+
+        <section id="sec-simulador" class="content-section">
+            <h1>Cadastrar Equipamentos</h1>
+            <div class="card">
+                <div class="grid-inputs">
+                    <div><label>Equipamento</label><input type="text" id="inp-nome" placeholder="TV, Chuveiro..."></div>
+                    <div><label>Watts</label><input type="number" id="inp-watts" placeholder="100"></div>
+                    <div><label>Qtd</label><input type="number" id="inp-qtd" value="1"></div>
+                    <div><label>Horas</label><input type="number" id="inp-horas" value="0"></div>
+                    <div><label>Minutos</label><input type="number" id="inp-minutos" value="15"></div>
+                    <div><label>Dias/Mês</label><input type="number" id="inp-dias" value="30"></div>
+                    <button class="btn-add" onclick="addItem()">+</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Aparelho</th>
+                                <th>Potência Total</th>
+                                <th>Tempo Diário</th>
+                                <th>Consumo (kWh)</th>
+                                <th>Custo (R$)</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-config" class="content-section">
+            <h1>Configurações</h1>
+            <div class="card" style="max-width: 400px;">
+                <label>Tarifa Base (R$ por kWh)</label>
+                <input type="number" id="cfg-tarifa" value="0.92" step="0.01">
+                
+                <label style="display: block; margin-top: 15px;">Bandeira Tarifária</label>
+                <select id="cfg-bandeira" style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.3); color: white; border: 1px solid rgba(255,255,255,0.1); outline: none;">
+                    <option value="0">🟢 Bandeira Verde (Sem adicional)</option>
+                    <option value="0.01884">🟡 Bandeira Amarela (+ R$ 0,018 por kWh)</option>
+                    <option value="0.04463">🔴 Bandeira Vermelha (+ R$ 0,44 por kWh)</option>
+                </select>
+
+                <label style="display: block; margin-top: 15px;">Sua Cidade (Para Clima)</label>
+                <input type="text" id="cfg-cidade" placeholder="Ex: São Paulo, BR">
+        
+                <button onclick="saveConfig()" style="background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 20px;">Salvar Configurações</button>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://srwhournhfadlwbixkxt.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyd2hvdXJuaGZhZGx3Yml4a3h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDMwNTIsImV4cCI6MjA5MDAxOTA1Mn0.HRt-0Rs9-FQxnywBlgOwnP7PO0ea7W7F26Zqlz-whow";
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let tarifaAtual = parseFloat(localStorage.getItem('tarifa_energia')) || 0.92;
+    let adicionalBandeira = parseFloat(localStorage.getItem('adicional_bandeira')) || 0;
+
+    function switchTab(tabId, el) {
+        document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+        document.getElementById('sec-' + tabId).classList.add('active');
+        el.classList.add('active');
+    }
+
+    async function checkUser() {
+        const { data: { session } } = await client.auth.getSession();
+        if (!session) {
+            window.location.href = "index.html";
+        } else {
+            document.getElementById("app").style.display = "flex";
+            document.getElementById("user-name").innerText = session.user.email.split('@')[0].toUpperCase();
+            
+            const cidadeSalva = localStorage.getItem('user_cidade');
+            if (document.getElementById("cfg-cidade")) {
+                document.getElementById("cfg-cidade").value = cidadeSalva || "";
+            }
+            if (cidadeSalva) buscarClima(cidadeSalva);
+            fetchEquipamentos();
+        }
+    }
+
+    async function addItem() {
+        const { data: { session } } = await client.auth.getSession();
+        const nome = document.getElementById("inp-nome").value;
+        const watts = parseFloat(document.getElementById("inp-watts").value);
+        const qtd = parseInt(document.getElementById("inp-qtd").value);
+        const h = parseInt(document.getElementById("inp-horas").value) || 0;
+        const m = parseInt(document.getElementById("inp-minutos").value) || 0;
+        const dias = parseFloat(document.getElementById("inp-dias").value);
+
+        if (!nome || isNaN(watts)) return alert("Preencha os dados corretamente!");
+
+        const tempoTotalHoras = h + (m / 60);
+        const { error } = await client.from('equipamentos').insert([{ 
+            user_id: session.user.id, 
+            nome, 
+            watts, 
+            qtd, 
+            horas: tempoTotalHoras, 
+            dias 
+        }]);
+
+        if (error) alert(error.message);
+        else { fetchEquipamentos(); clearInputs(); }
+    }
+
+    async function fetchEquipamentos() {
+        const { data, error } = await client.from('equipamentos').select('*');
+        if (error) console.error(error);
+        else renderTable(data);
+    }
+
+    async function removeItem(id) {
+        if(confirm("Remover este item?")) {
+            await client.from('equipamentos').delete().eq('id', id);
+            fetchEquipamentos();
+        }
+    }
+
+    function renderTable(data) {
+        const body = document.getElementById("table-body");
+        body.innerHTML = "";
+        let totalKwh = 0;
+        const tarifaFinal = tarifaAtual + adicionalBandeira;
+
+        data.forEach(item => {
+            const consumo = (item.watts * item.qtd * item.horas * item.dias) / 1000;
+            const custo = consumo * tarifaFinal;
+            totalKwh += consumo;
+
+            const hDisplay = Math.floor(item.horas);
+            const mDisplay = Math.round((item.horas - hDisplay) * 60);
+            
+            body.innerHTML += `
+                <tr>
+                    <td>${item.nome}</td>
+                    <td>${item.watts * item.qtd}W</td>
+                    <td>${hDisplay}h ${mDisplay}m</td>
+                    <td>${consumo.toFixed(2)}</td>
+                    <td>R$ ${custo.toFixed(2)}</td>
+                    <td><button class="delete-btn" onclick="removeItem('${item.id}')">🗑️</button></td>
+                </tr>`;
+        });
+
+        document.getElementById("resumo-kwh").innerText = `${totalKwh.toFixed(2)} kWh`;
+        document.getElementById("resumo-preco").innerText = `R$ ${(totalKwh * tarifaFinal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    }
+
+    function clearInputs() {
+        document.getElementById("inp-nome").value = "";
+        document.getElementById("inp-watts").value = "";
+        document.getElementById("inp-horas").value = "0";
+        document.getElementById("inp-minutos").value = "15";
+    }
+
+    function saveConfig() {
+        tarifaAtual = parseFloat(document.getElementById("cfg-tarifa").value);
+        adicionalBandeira = parseFloat(document.getElementById("cfg-bandeira").value);
+        const cidade = document.getElementById("cfg-cidade").value;
+        
+        localStorage.setItem('tarifa_energia', tarifaAtual);
+        localStorage.setItem('adicional_bandeira', adicionalBandeira);
+        localStorage.setItem('user_cidade', cidade);
+        
+        fetchEquipamentos();
+        if (cidade) buscarClima(cidade);
+        alert("Configurações salvas!");
+    }
+
+    async function buscarClima(cidade) {
+        const API_KEY = "f7ccbb67970ac957a4bed8b790c791ce"; 
+        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cidade)}&units=metric&lang=pt_br&appid=${API_KEY}`;
+        try {
+            const resposta = await fetch(url);
+            const dados = await resposta.json();
+            if (dados.cod === 200) {
+                document.getElementById("temp-valor").innerText = `${dados.main.temp.toFixed(1)}°C`;
+                document.getElementById("temp-desc").innerText = dados.weather[0].description;
+                document.getElementById("txt-cidade").innerText = dados.name;
+                const alerta = document.getElementById("alerta-sos");
+                if(dados.main.temp < 22) {
+                    alerta.style.display = "block";
+                    document.getElementById("msg-sos").innerText = "Clima fresco! Que tal desligar o ar-condicionado?";
+                } else { alerta.style.display = "none"; }
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function handleLogout() {
+        await client.auth.signOut();
+        window.location.href = "index.html";
+    }
+
+    window.onload = checkUser;
+</script>
+</body>
+</html>
