@@ -25,6 +25,7 @@
             overflow: hidden;
         }
 
+        /* BARRA LATERAL */
         .sidebar {
             width: 280px;
             min-width: 280px;
@@ -228,7 +229,6 @@
         }
     }
 
-    //  Busca cidade pelo CEP
     async function buscarCidadePorCEP() {
         const cep = document.getElementById("cfg-cep").value.replace(/\D/g, '');
         if (cep.length !== 8) return alert("Digite um CEP válido!");
@@ -281,20 +281,23 @@
 
         data.forEach(item => {
             const consumo = (item.watts * item.qtd * item.horas * item.dias) / 1000;
+            const custo = consumo * tarifaFinal;
             totalKwh += consumo;
+            
             body.innerHTML += `
                 <tr>
                     <td>${item.nome}</td>
                     <td>${item.watts * item.qtd}W</td>
                     <td>${Math.floor(item.horas)}h ${Math.round((item.horas % 1) * 60)}m</td>
                     <td>${consumo.toFixed(2)}</td>
-                    <td>R$ ${(consumo * tarifaFinal).toFixed(2)}</td>
+                    <td>R$ ${custo.toFixed(2)}</td>
                     <td><button class="delete-btn" onclick="removeItem('${item.id}')">🗑️</button></td>
                 </tr>`;
         });
 
         document.getElementById("resumo-kwh").innerText = `${totalKwh.toFixed(2)} kWh`;
-        document.getElementById("resumo-preco").innerText = `R$ ${(totalKwh * tarifaFinal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+        // Ajuste no preço para formatar como moeda corretamente
+        document.getElementById("resumo-preco").innerText = (totalKwh * tarifaFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
     function clearInputs() {
@@ -318,24 +321,34 @@
         alert("Configurações salvas!");
     }
 
+    // CORREÇÃO: Usando a API 2.5 (mais estável para chaves Free)
     async function buscarClima(cidade) {
         const API_KEY = "f7ccbb67970ac957a4bed8b790c791ce"; 
         const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cidade)}&units=metric&lang=pt_br&appid=${API_KEY}`;
+        
         try {
             const resposta = await fetch(url);
             const dados = await resposta.json();
-            if (dados.cod === 200) {
-                document.getElementById("temp-valor").innerText = `${dados.main.temp.toFixed(1)}°C`;
-                document.getElementById("temp-desc").innerText = dados.weather[0].description;
-                document.getElementById("txt-cidade").innerText = dados.name;
-                
-                const alerta = document.getElementById("alerta-sos");
-                if(dados.main.temp < 23) {
-                    alerta.style.display = "block";
-                    document.getElementById("msg-sos").innerText = "Está fresco lá fora! Se puder, evite usar ar-condicionado para economizar.";
-                } else { alerta.style.display = "none"; }
+            
+            if (dados.cod !== 200) {
+                console.warn("Aviso clima:", dados.message);
+                document.getElementById("temp-desc").innerText = "Aguardando ativação da chave...";
+                return;
             }
-        } catch (e) { console.error("Erro clima:", e); }
+
+            document.getElementById("temp-valor").innerText = `${dados.main.temp.toFixed(1)}°C`;
+            document.getElementById("temp-desc").innerText = dados.weather[0].description;
+            document.getElementById("txt-cidade").innerText = dados.name;
+            
+            const alerta = document.getElementById("alerta-sos");
+            if(dados.main.temp < 23) {
+                alerta.style.display = "block";
+                document.getElementById("msg-sos").innerText = "Está fresco lá fora! Se puder, evite usar ar-condicionado para economizar.";
+            } else { alerta.style.display = "none"; }
+
+        } catch (e) { 
+            console.error("Erro total clima:", e); 
+        }
     }
 
     async function handleLogout() {
