@@ -22,10 +22,9 @@
             background: linear-gradient(135deg, #0f172a, #1e1b4b);
             display: flex;
             color: white;
-            overflow: hidden; /* Impede a rolagem do fundo */
+            overflow: hidden;
         }
 
-        /* BARRA LATERAL FIXA */
         .sidebar {
             width: 280px;
             min-width: 280px;
@@ -55,16 +54,14 @@
         .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.1); color: white; }
         .menu-item.active { border-left: 4px solid var(--accent); background: rgba(16, 185, 129, 0.1); }
 
-        /* ÁREA DE CONTEÚDO COM ROLAGEM */
         .main-content { 
             flex: 1; 
             padding: 40px; 
-            overflow-y: auto; /* ATIVA A BARRA DE ROLAGEM AQUI */
+            overflow-y: auto; 
             height: 100vh;
             background: rgba(0,0,0,0.2); 
         }
 
-        /* Estilização da Barra de Rolagem */
         .main-content::-webkit-scrollbar { width: 8px; }
         .main-content::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
         .main-content::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
@@ -83,13 +80,14 @@
             align-items: flex-end; 
         }
 
-        input {
+        input, select {
             width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
             background: rgba(0,0,0,0.3); color: white; outline: none;
         }
 
         button { cursor: pointer; border: none; border-radius: 10px; font-weight: bold; transition: 0.3s; }
         .btn-add { background: var(--accent); color: white; height: 45px; width: 50px; font-size: 1.5rem; }
+        .btn-search { background: var(--primary); color: white; padding: 0 15px; }
         .logout-btn { margin-top: auto; background: var(--danger); color: white; padding: 12px; opacity: 0.8; }
 
         .table-container { margin-top: 20px; border-radius: 15px; overflow: hidden; background: rgba(0,0,0,0.2); }
@@ -170,21 +168,25 @@
 
         <section id="sec-config" class="content-section">
             <h1>Configurações</h1>
-            <div class="card" style="max-width: 400px;">
+            <div class="card" style="max-width: 450px;">
                 <label>Tarifa Base (R$ por kWh)</label>
                 <input type="number" id="cfg-tarifa" value="0.92" step="0.01">
                 
                 <label style="display: block; margin-top: 15px;">Bandeira Tarifária</label>
-                <select id="cfg-bandeira" style="width: 100%; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.3); color: white; border: 1px solid rgba(255,255,255,0.1); outline: none;">
+                <select id="cfg-bandeira">
                     <option value="0">🟢 Bandeira Verde (Sem adicional)</option>
                     <option value="0.01884">🟡 Bandeira Amarela (+ R$ 0,018 por kWh)</option>
                     <option value="0.04463">🔴 Bandeira Vermelha (+ R$ 0,44 por kWh)</option>
                 </select>
 
-                <label style="display: block; margin-top: 15px;">Sua Cidade (Para Clima)</label>
-                <input type="text" id="cfg-cidade" placeholder="Ex: São Paulo, BR">
+                <label style="display: block; margin-top: 15px;">Localização (CEP)</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="cfg-cep" placeholder="00000-000" maxlength="9">
+                    <button class="btn-search" onclick="buscarCidadePorCEP()">Buscar</button>
+                </div>
+                <input type="text" id="cfg-cidade" placeholder="Cidade identificada..." readonly style="margin-top: 8px; opacity: 0.7; background: rgba(0,0,0,0.5);">
         
-                <button onclick="saveConfig()" style="background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 20px;">Salvar Configurações</button>
+                <button onclick="saveConfig()" style="background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 25px;">Salvar Configurações</button>
             </div>
         </section>
     </main>
@@ -214,12 +216,31 @@
             document.getElementById("user-name").innerText = session.user.email.split('@')[0].toUpperCase();
             
             const cidadeSalva = localStorage.getItem('user_cidade');
+            const cepSalvo = localStorage.getItem('user_cep');
+
             if (document.getElementById("cfg-cidade")) {
                 document.getElementById("cfg-cidade").value = cidadeSalva || "";
+                document.getElementById("cfg-cep").value = cepSalvo || "";
             }
+            
             if (cidadeSalva) buscarClima(cidadeSalva);
             fetchEquipamentos();
         }
+    }
+
+    //  Busca cidade pelo CEP
+    async function buscarCidadePorCEP() {
+        const cep = document.getElementById("cfg-cep").value.replace(/\D/g, '');
+        if (cep.length !== 8) return alert("Digite um CEP válido!");
+
+        try {
+            const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+            const data = await res.json();
+            if (data.erro) alert("CEP não encontrado!");
+            else {
+                document.getElementById("cfg-cidade").value = `${data.localidade}, ${data.uf}`;
+            }
+        } catch (e) { alert("Erro ao buscar CEP."); }
     }
 
     async function addItem() {
@@ -231,30 +252,22 @@
         const m = parseInt(document.getElementById("inp-minutos").value) || 0;
         const dias = parseFloat(document.getElementById("inp-dias").value);
 
-        if (!nome || isNaN(watts)) return alert("Preencha os dados corretamente!");
+        if (!nome || isNaN(watts)) return alert("Preencha os dados!");
 
         const tempoTotalHoras = h + (m / 60);
-        const { error } = await client.from('equipamentos').insert([{ 
-            user_id: session.user.id, 
-            nome, 
-            watts, 
-            qtd, 
-            horas: tempoTotalHoras, 
-            dias 
+        await client.from('equipamentos').insert([{ 
+            user_id: session.user.id, nome, watts, qtd, horas: tempoTotalHoras, dias 
         }]);
-
-        if (error) alert(error.message);
-        else { fetchEquipamentos(); clearInputs(); }
+        fetchEquipamentos(); clearInputs();
     }
 
     async function fetchEquipamentos() {
         const { data, error } = await client.from('equipamentos').select('*');
-        if (error) console.error(error);
-        else renderTable(data);
+        if (!error) renderTable(data);
     }
 
     async function removeItem(id) {
-        if(confirm("Remover este item?")) {
+        if(confirm("Remover item?")) {
             await client.from('equipamentos').delete().eq('id', id);
             fetchEquipamentos();
         }
@@ -268,19 +281,14 @@
 
         data.forEach(item => {
             const consumo = (item.watts * item.qtd * item.horas * item.dias) / 1000;
-            const custo = consumo * tarifaFinal;
             totalKwh += consumo;
-
-            const hDisplay = Math.floor(item.horas);
-            const mDisplay = Math.round((item.horas - hDisplay) * 60);
-            
             body.innerHTML += `
                 <tr>
                     <td>${item.nome}</td>
                     <td>${item.watts * item.qtd}W</td>
-                    <td>${hDisplay}h ${mDisplay}m</td>
+                    <td>${Math.floor(item.horas)}h ${Math.round((item.horas % 1) * 60)}m</td>
                     <td>${consumo.toFixed(2)}</td>
-                    <td>R$ ${custo.toFixed(2)}</td>
+                    <td>R$ ${(consumo * tarifaFinal).toFixed(2)}</td>
                     <td><button class="delete-btn" onclick="removeItem('${item.id}')">🗑️</button></td>
                 </tr>`;
         });
@@ -292,21 +300,21 @@
     function clearInputs() {
         document.getElementById("inp-nome").value = "";
         document.getElementById("inp-watts").value = "";
-        document.getElementById("inp-horas").value = "0";
-        document.getElementById("inp-minutos").value = "15";
     }
 
     function saveConfig() {
         tarifaAtual = parseFloat(document.getElementById("cfg-tarifa").value);
         adicionalBandeira = parseFloat(document.getElementById("cfg-bandeira").value);
         const cidade = document.getElementById("cfg-cidade").value;
+        const cep = document.getElementById("cfg-cep").value;
         
         localStorage.setItem('tarifa_energia', tarifaAtual);
         localStorage.setItem('adicional_bandeira', adicionalBandeira);
         localStorage.setItem('user_cidade', cidade);
+        localStorage.setItem('user_cep', cep);
         
-        fetchEquipamentos();
         if (cidade) buscarClima(cidade);
+        fetchEquipamentos();
         alert("Configurações salvas!");
     }
 
@@ -320,13 +328,14 @@
                 document.getElementById("temp-valor").innerText = `${dados.main.temp.toFixed(1)}°C`;
                 document.getElementById("temp-desc").innerText = dados.weather[0].description;
                 document.getElementById("txt-cidade").innerText = dados.name;
+                
                 const alerta = document.getElementById("alerta-sos");
-                if(dados.main.temp < 22) {
+                if(dados.main.temp < 23) {
                     alerta.style.display = "block";
-                    document.getElementById("msg-sos").innerText = "Clima fresco! Que tal desligar o ar-condicionado?";
+                    document.getElementById("msg-sos").innerText = "Está fresco lá fora! Se puder, evite usar ar-condicionado para economizar.";
                 } else { alerta.style.display = "none"; }
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Erro clima:", e); }
     }
 
     async function handleLogout() {
