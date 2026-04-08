@@ -191,9 +191,9 @@
             </div>
         </section>
     </main>
-</div>
+</div>  
 
-<script>
+<script>  // BANCO DE DADOS
     const SUPABASE_URL = "https://srwhournhfadlwbixkxt.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyd2hvdXJuaGZhZGx3Yml4a3h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDMwNTIsImV4cCI6MjA5MDAxOTA1Mn0.HRt-0Rs9-FQxnywBlgOwnP7PO0ea7W7F26Zqlz-whow";
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -229,10 +229,10 @@
         }
     }
 
-    // --- NOVA LOGICA DE CLIMA (OPÇÃO 1: OPEN-METEO) ---
+    // CLIMA 
     async function buscarClimaOpenMeteo(cidadeNome) {
         try {
-            // 1. Precisamos converter Nome da Cidade em Latitude/Longitude (Geocoding)
+            // cep
             const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cidadeNome)}&count=1&language=pt&format=json`);
             const geoData = await geoRes.json();
 
@@ -244,7 +244,7 @@
             const { latitude, longitude, name } = geoData.results[0];
             document.getElementById("txt-cidade").innerText = name;
 
-            // 2. Agora buscamos o clima real na Open-Meteo usando as coordenadas
+            //  buscamos o clima 
             const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto`);
             const weatherData = await weatherRes.json();
 
@@ -256,7 +256,7 @@
             document.getElementById("temp-valor").innerText = `${temp.toFixed(1)}°C`;
             document.getElementById("temp-desc").innerText = interpretarWeatherCode(code) + ` | UR: ${humidity}%`;
 
-            // Lógica de Sugestão (Trade-off)
+            // alerta de temperatura
             const alerta = document.getElementById("alerta-sos");
             if(temp < 23) {
                 alerta.style.display = "block";
@@ -271,7 +271,7 @@
         }
     }
 
-    // Helper para traduzir os códigos da Open-Meteo
+    // códigos da Open-Meteo
     function interpretarWeatherCode(code) {
         if (code === 0) return "Céu limpo";
         if (code <= 3) return "Parcialmente nublado";
@@ -281,7 +281,7 @@
         return "Instável";
     }
 
-    // --- FUNÇÕES DE SUPABASE E TABELA ---
+    // SUPABASE E TABELA
     async function addItem() {
         const { data: { session } } = await client.auth.getSession();
         const nome = document.getElementById("inp-nome").value;
@@ -338,7 +338,7 @@
         document.getElementById("resumo-preco").innerText = (totalKwh * tarifaFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
-    // --- CONFIGURAÇÕES E CEP ---
+    // cep
     async function buscarCidadePorCEP() {
         const cep = document.getElementById("cfg-cep").value.replace(/\D/g, '');
         if (cep.length !== 8) return alert("Digite um CEP válido!");
