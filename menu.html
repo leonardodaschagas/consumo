@@ -127,7 +127,7 @@
                 <div class="card" id="card-clima">
                     <span style="opacity: 0.7;">Clima Externo (<span id="txt-cidade">--</span>)</span>
                     <h2 id="temp-valor" style="font-size: 2.2rem; color: var(--accent); margin-top: 10px;">--°C</h2>
-                    <p id="temp-desc" style="text-transform: capitalize; font-size: 0.9rem; opacity: 0.8;">Carregando...</p>
+                    <p id="temp-desc" style="text-transform: capitalize; font-size: 0.9rem; opacity: 0.8;">Atualizando...</p>
                 </div>
             </div>
         
@@ -224,25 +224,64 @@
                 document.getElementById("cfg-cep").value = cepSalvo || "";
             }
             
-            if (cidadeSalva) buscarClima(cidadeSalva);
+            if (cidadeSalva) buscarClimaOpenMeteo(cidadeSalva);
             fetchEquipamentos();
         }
     }
 
-    async function buscarCidadePorCEP() {
-        const cep = document.getElementById("cfg-cep").value.replace(/\D/g, '');
-        if (cep.length !== 8) return alert("Digite um CEP válido!");
-
+    // --- NOVA LOGICA DE CLIMA (OPÇÃO 1: OPEN-METEO) ---
+    async function buscarClimaOpenMeteo(cidadeNome) {
         try {
-            const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-            const data = await res.json();
-            if (data.erro) alert("CEP não encontrado!");
-            else {
-                document.getElementById("cfg-cidade").value = `${data.localidade}, ${data.uf}`;
+            // 1. Precisamos converter Nome da Cidade em Latitude/Longitude (Geocoding)
+            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cidadeNome)}&count=1&language=pt&format=json`);
+            const geoData = await geoRes.json();
+
+            if (!geoData.results || geoData.results.length === 0) {
+                document.getElementById("temp-desc").innerText = "Cidade não encontrada";
+                return;
             }
-        } catch (e) { alert("Erro ao buscar CEP."); }
+
+            const { latitude, longitude, name } = geoData.results[0];
+            document.getElementById("txt-cidade").innerText = name;
+
+            // 2. Agora buscamos o clima real na Open-Meteo usando as coordenadas
+            const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto`);
+            const weatherData = await weatherRes.json();
+
+            const temp = weatherData.current.temperature_2m;
+            const humidity = weatherData.current.relative_humidity_2m;
+            const code = weatherData.current.weather_code;
+
+            // Atualiza Interface
+            document.getElementById("temp-valor").innerText = `${temp.toFixed(1)}°C`;
+            document.getElementById("temp-desc").innerText = interpretarWeatherCode(code) + ` | UR: ${humidity}%`;
+
+            // Lógica de Sugestão (Trade-off)
+            const alerta = document.getElementById("alerta-sos");
+            if(temp < 23) {
+                alerta.style.display = "block";
+                document.getElementById("msg-sos").innerText = `Está fazendo ${temp}°C em ${name}. Abra as janelas e evite ligar o ar-condicionado ou ventiladores para reduzir o custo do mês!`;
+            } else { 
+                alerta.style.display = "none"; 
+            }
+
+        } catch (e) {
+            console.error("Erro ao buscar clima:", e);
+            document.getElementById("temp-desc").innerText = "Erro ao carregar clima";
+        }
     }
 
+    // Helper para traduzir os códigos da Open-Meteo
+    function interpretarWeatherCode(code) {
+        if (code === 0) return "Céu limpo";
+        if (code <= 3) return "Parcialmente nublado";
+        if (code <= 48) return "Nevoeiro";
+        if (code <= 67) return "Chuva leve";
+        if (code <= 82) return "Pancadas de chuva";
+        return "Instável";
+    }
+
+    // --- FUNÇÕES DE SUPABASE E TABELA ---
     async function addItem() {
         const { data: { session } } = await client.auth.getSession();
         const nome = document.getElementById("inp-nome").value;
@@ -296,13 +335,22 @@
         });
 
         document.getElementById("resumo-kwh").innerText = `${totalKwh.toFixed(2)} kWh`;
-        // Ajuste no preço para formatar como moeda corretamente
         document.getElementById("resumo-preco").innerText = (totalKwh * tarifaFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
-    function clearInputs() {
-        document.getElementById("inp-nome").value = "";
-        document.getElementById("inp-watts").value = "";
+    // --- CONFIGURAÇÕES E CEP ---
+    async function buscarCidadePorCEP() {
+        const cep = document.getElementById("cfg-cep").value.replace(/\D/g, '');
+        if (cep.length !== 8) return alert("Digite um CEP válido!");
+
+        try {
+            const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+            const data = await res.json();
+            if (data.erro) alert("CEP não encontrado!");
+            else {
+                document.getElementById("cfg-cidade").value = `${data.localidade}`;
+            }
+        } catch (e) { alert("Erro ao buscar CEP."); }
     }
 
     function saveConfig() {
@@ -316,39 +364,14 @@
         localStorage.setItem('user_cidade', cidade);
         localStorage.setItem('user_cep', cep);
         
-        if (cidade) buscarClima(cidade);
+        if (cidade) buscarClimaOpenMeteo(cidade);
         fetchEquipamentos();
         alert("Configurações salvas!");
     }
 
-    // CORREÇÃO: Usando a API 2.5 (mais estável para chaves Free)
-    async function buscarClima(cidade) {
-        const API_KEY = "f7ccbb67970ac957a4bed8b790c791ce"; 
-        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cidade)}&units=metric&lang=pt_br&appid=${API_KEY}`;
-        
-        try {
-            const resposta = await fetch(url);
-            const dados = await resposta.json();
-            
-            if (dados.cod !== 200) {
-                console.warn("Aviso clima:", dados.message);
-                document.getElementById("temp-desc").innerText = "Aguardando ativação da chave...";
-                return;
-            }
-
-            document.getElementById("temp-valor").innerText = `${dados.main.temp.toFixed(1)}°C`;
-            document.getElementById("temp-desc").innerText = dados.weather[0].description;
-            document.getElementById("txt-cidade").innerText = dados.name;
-            
-            const alerta = document.getElementById("alerta-sos");
-            if(dados.main.temp < 23) {
-                alerta.style.display = "block";
-                document.getElementById("msg-sos").innerText = "Está fresco lá fora! Se puder, evite usar ar-condicionado para economizar.";
-            } else { alerta.style.display = "none"; }
-
-        } catch (e) { 
-            console.error("Erro total clima:", e); 
-        }
+    function clearInputs() {
+        document.getElementById("inp-nome").value = "";
+        document.getElementById("inp-watts").value = "";
     }
 
     async function handleLogout() {
