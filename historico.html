@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Histórico de Consumo - Gestão Pro</title>
+    <title>Histórico & Auditoria de Fatura - Gestão Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -13,6 +13,7 @@
             --accent: #10b981;
             --warning: #fbbf24;
             --danger: #ef4444;
+            --real: #38bdf8;
             --glass: rgba(255, 255, 255, 0.05);
         }
 
@@ -77,6 +78,24 @@
             margin-bottom: 25px; 
         }
 
+        .inputs-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-group label {
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+
         input {
             padding: 10px 14px;
             border-radius: 10px;
@@ -97,11 +116,22 @@
         .btn-salvar { background: var(--accent); color: white; padding: 10px 20px; }
         .btn-salvar:hover { opacity: 0.9; }
 
+        .btn-fechar { background: var(--primary); color: white; padding: 10px 16px; font-size: 0.85rem; }
+
         .table-container { margin-top: 15px; border-radius: 15px; overflow: hidden; background: rgba(0,0,0,0.2); }
         table { width: 100%; border-collapse: collapse; }
         th { background: rgba(255,255,255,0.05); padding: 15px; text-align: left; font-size: 0.85rem; color: var(--accent); }
         td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
         .delete-btn { background: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; }
+
+        .badge-diff {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .diff-plus { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .diff-minus { background: rgba(16, 185, 129, 0.2); color: var(--accent); }
 
         .grid-cards {
             display: grid;
@@ -120,41 +150,63 @@
         <h2>Gestão de Consumo</h2>
         <a href="menu.html" class="menu-item">🏠 Painel Geral</a>
         <a href="menu.html" class="menu-item">⚡ Minha Residência</a>
-        <a href="historico.html" class="menu-item active">📊 Histórico & Gráficos</a>
+        <a href="historico.html" class="menu-item active">📊 Histórico & Auditoria</a>
         <a href="menu.html" class="menu-item">⚙️ Configurações</a>
     </nav>
 
     <main class="main-content">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;">
             <div>
-                <h1>Relatório & Evolução Mensal</h1>
-                <p style="opacity: 0.7; font-size: 0.9rem; margin-top: 4px;">Acompanhe o consumo e histórico de custos ao longo dos meses.</p>
+                <h1>Auditoria de Fatura & Histórico</h1>
+                <p style="opacity: 0.7; font-size: 0.9rem; margin-top: 4px;">Compare a estimativa dos seus aparelhos com o que a distribuidora cobrou.</p>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <input type="month" id="hist-competencia">
-                <button class="btn-salvar" onclick="fecharMesComEquipamentos()">💾 Fechar Mês Atual</button>
+            <button class="btn-fechar" onclick="fecharMesSimulado()">
+                ⚡ Importar Soma dos Aparelhos no Mês
+            </button>
+        </div>
+
+        <!-- FORMULÁRIO DE LANÇAMENTO DA CONTA REAL -->
+        <div class="card">
+            <h3 style="margin-bottom: 15px; color: var(--real);">🧾 Lançar Fatura da Distribuidora (Conta Real)</h3>
+            <div class="inputs-row">
+                <div class="input-group">
+                    <label>Mês de Referência</label>
+                    <input type="month" id="hist-competencia">
+                </div>
+                <div class="input-group">
+                    <label>kWh Faturado na Conta</label>
+                    <input type="number" id="inp-kwh-real" placeholder="Ex: 250" step="0.1">
+                </div>
+                <div class="input-group">
+                    <label>Valor Total Pago (R$)</label>
+                    <input type="number" id="inp-custo-real" placeholder="Ex: 245.50" step="0.01">
+                </div>
+                <button class="btn-salvar" onclick="salvarFaturaReal()">💾 Gravar Dados Reais</button>
             </div>
         </div>
 
         <!-- CARDS DE METRICAS GERAIS -->
         <div class="grid-cards">
             <div class="card">
-                <span style="opacity: 0.7;">Média Mensal (kWh)</span>
-                <h2 id="metrica-media-kwh" style="font-size: 2rem; color: var(--accent); margin-top: 8px;">0.00 kWh</h2>
+                <span style="opacity: 0.7;">Média Estimada vs Real</span>
+                <h2 id="metrica-media-kwh" style="font-size: 1.8rem; color: var(--accent); margin-top: 8px;">-- / --</h2>
+                <small style="opacity: 0.6;">kWh simulado vs real</small>
             </div>
             <div class="card">
-                <span style="opacity: 0.7;">Média Mensal (R$)</span>
-                <h2 id="metrica-media-custo" style="font-size: 2rem; color: var(--warning); margin-top: 8px;">R$ 0,00</h2>
+                <span style="opacity: 0.7;">Tarifa Média Efetiva Real</span>
+                <h2 id="metrica-tarifa-efetiva" style="font-size: 1.8rem; color: var(--real); margin-top: 8px;">R$ 0,00/kWh</h2>
+                <small style="opacity: 0.6;">Com todos impostos e taxas</small>
             </div>
             <div class="card">
-                <span style="opacity: 0.7;">Meses Registrados</span>
-                <h2 id="metrica-total-meses" style="font-size: 2rem; margin-top: 8px;">0</h2>
+                <span style="opacity: 0.7;">Meses Fechados</span>
+                <h2 id="metrica-total-meses" style="font-size: 1.8rem; margin-top: 8px;">0</h2>
+                <small style="opacity: 0.6;">Competências no banco</small>
             </div>
         </div>
 
-        <!-- GRÁFICO -->
+        <!-- GRÁFICO ESTIMADO VS REAL -->
         <div class="card">
-            <h3 style="margin-bottom: 15px;">Evolução de Consumo e Gastos</h3>
+            <h3 style="margin-bottom: 15px;">Comparativo: Consumo Estimado vs Consumo Real da Conta (kWh)</h3>
             <div style="position: relative; height: 320px; width: 100%;">
                 <canvas id="graficoHistorico"></canvas>
             </div>
@@ -162,15 +214,17 @@
 
         <!-- TABELA -->
         <div class="card">
-            <h3>Tabela Detalhada de Fechamentos</h3>
+            <h3>Tabela Detalhada de Competências</h3>
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
                             <th>Mês / Ano</th>
-                            <th>Consumo (kWh)</th>
-                            <th>Custo Total (R$)</th>
-                            <th>Tarifa Aplicada (R$/kWh)</th>
+                            <th>Estimado (kWh)</th>
+                            <th>Real (kWh)</th>
+                            <th>Desvio (kWh)</th>
+                            <th>Valor Pago (R$)</th>
+                            <th>Tarifa Real (R$/kWh)</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -203,18 +257,47 @@
         }
     }
 
-    // Calcula o consumo atual da residência e grava no histórico
-    async function fecharMesComEquipamentos() {
+    // Grava apenas os dados da conta real que o usuário recebeu
+    async function salvarFaturaReal() {
         const { data: { session } } = await client.auth.getSession();
         if (!session) return;
 
         const mesEscolhido = document.getElementById("hist-competencia").value;
-        if (!mesEscolhido) return alert("Selecione o mês/ano!");
+        const kwhReal = parseFloat(document.getElementById("inp-kwh-real").value);
+        const custoReal = parseFloat(document.getElementById("inp-custo-real").value);
 
-        // Busca os aparelhos do usuário para calcular a soma
+        if (!mesEscolhido) return alert("Selecione o mês!");
+        if (isNaN(kwhReal) || isNaN(custoReal)) return alert("Informe os valores de kWh e Valor Total da fatura!");
+
+        // Faz upsert mantendo o estimado se já existir
+        const { error } = await client.from('historico_mensal').upsert({
+            user_id: session.user.id,
+            mes_ano: mesEscolhido,
+            kwh_real: Number(kwhReal.toFixed(2)),
+            custo_real: Number(custoReal.toFixed(2))
+        }, { onConflict: 'user_id,mes_ano' });
+
+        if (error) {
+            alert("Erro ao gravar dados reais: " + error.message);
+        } else {
+            alert(`Fatura real de ${mesEscolhido} salva com sucesso!`);
+            document.getElementById("inp-kwh-real").value = "";
+            document.getElementById("inp-custo-real").value = "";
+            fetchHistorico();
+        }
+    }
+
+    // Calcula a soma dos equipamentos da tela inicial e salva na competência
+    async function fecharMesSimulado() {
+        const { data: { session } } = await client.auth.getSession();
+        if (!session) return;
+
+        const mesEscolhido = document.getElementById("hist-competencia").value;
+        if (!mesEscolhido) return alert("Selecione o mês!");
+
         const { data: equipamentos, error: errEq } = await client.from('equipamentos').select('*');
         if (errEq || !equipamentos || equipamentos.length === 0) {
-            return alert("Nenhum equipamento cadastrado para calcular o mês!");
+            return alert("Nenhum equipamento cadastrado na residência!");
         }
 
         const tarifaBase = parseFloat(localStorage.getItem('tarifa_energia')) || 0.92;
@@ -237,9 +320,9 @@
         }, { onConflict: 'user_id,mes_ano' });
 
         if (error) {
-            alert("Erro ao gravar histórico: " + error.message);
+            alert("Erro ao sincronizar estimativa: " + error.message);
         } else {
-            alert(`Competência ${mesEscolhido} fechada com sucesso!`);
+            alert(`Estimativa dos aparelhos para ${mesEscolhido} vinculada!`);
             fetchHistorico();
         }
     }
@@ -260,44 +343,71 @@
         tbody.innerHTML = "";
 
         const labels = [];
-        const dataKwh = [];
-        const dataCusto = [];
+        const dataKwhEstimado = [];
+        const dataKwhReal = [];
 
-        let somaKwh = 0;
-        let somaCusto = 0;
+        let somaKwhEstimado = 0;
+        let somaKwhReal = 0;
+        let totalTarifaEfetiva = 0;
+        let qtdComReal = 0;
 
         registros.forEach(item => {
             labels.push(item.mes_ano);
-            dataKwh.push(item.consumo_kwh);
-            dataCusto.push(item.custo_total);
+            dataKwhEstimado.push(item.consumo_kwh || 0);
+            dataKwhReal.push(item.kwh_real || null);
 
-            somaKwh += Number(item.consumo_kwh);
-            somaCusto += Number(item.custo_total);
+            somaKwhEstimado += Number(item.consumo_kwh || 0);
+            
+            let desvioHtml = "<span style='opacity: 0.5;'>--</span>";
+            let tarifaRealHtml = "<span style='opacity: 0.5;'>--</span>";
+
+            if (item.kwh_real) {
+                somaKwhReal += Number(item.kwh_real);
+                qtdComReal++;
+
+                if (item.consumo_kwh) {
+                    const diff = Number(item.kwh_real) - Number(item.consumo_kwh);
+                    const sinal = diff > 0 ? "+" : "";
+                    const badgeClass = diff > 0 ? "diff-plus" : "diff-minus";
+                    desvioHtml = `<span class="badge-diff ${badgeClass}">${sinal}${diff.toFixed(1)} kWh</span>`;
+                }
+
+                if (item.custo_real && item.kwh_real > 0) {
+                    const tarifaEfetiva = item.custo_real / item.kwh_real;
+                    totalTarifaEfetiva += tarifaEfetiva;
+                    tarifaRealHtml = `R$ ${tarifaEfetiva.toFixed(3)}`;
+                }
+            }
 
             tbody.innerHTML += `
                 <tr>
                     <td><strong>${item.mes_ano}</strong></td>
-                    <td>${Number(item.consumo_kwh).toFixed(2)} kWh</td>
-                    <td>R$ ${Number(item.custo_total).toFixed(2)}</td>
-                    <td>R$ ${Number(item.tarifa_aplicada || 0).toFixed(4)}</td>
+                    <td>${item.consumo_kwh ? Number(item.consumo_kwh).toFixed(1) + ' kWh' : '--'}</td>
+                    <td style="color: var(--real); font-weight: bold;">${item.kwh_real ? Number(item.kwh_real).toFixed(1) + ' kWh' : '--'}</td>
+                    <td>${desvioHtml}</td>
+                    <td>${item.custo_real ? 'R$ ' + Number(item.custo_real).toFixed(2) : '--'}</td>
+                    <td>${tarifaRealHtml}</td>
                     <td><button class="delete-btn" onclick="removerHistorico('${item.id}')">🗑️</button></td>
                 </tr>
             `;
         });
 
-        const totalMeses = registros.length;
-        document.getElementById("metrica-total-meses").innerText = totalMeses;
-        document.getElementById("metrica-media-kwh").innerText = totalMeses > 0 
-            ? `${(somaKwh / totalMeses).toFixed(2)} kWh` 
-            : "0.00 kWh";
-        document.getElementById("metrica-media-custo").innerText = totalMeses > 0 
-            ? (somaCusto / totalMeses).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) 
-            : "R$ 0,00";
+        const total = registros.length;
+        document.getElementById("metrica-total-meses").innerText = total;
 
-        desenharGrafico(labels, dataKwh, dataCusto);
+        const mediaEst = total > 0 ? (somaKwhEstimado / total).toFixed(0) : "0";
+        const mediaReal = qtdComReal > 0 ? (somaKwhReal / qtdComReal).toFixed(0) : "--";
+        document.getElementById("metrica-media-kwh").innerText = `${mediaEst} / ${mediaReal} kWh`;
+
+        const tarifaEfetivaMedia = qtdComReal > 0 ? (totalTarifaEfetiva / qtdComReal) : 0;
+        document.getElementById("metrica-tarifa-efetiva").innerText = tarifaEfetivaMedia > 0 
+            ? `R$ ${tarifaEfetivaMedia.toFixed(3)}/kWh` 
+            : "R$ 0,00/kWh";
+
+        desenharGrafico(labels, dataKwhEstimado, dataKwhReal);
     }
 
-    function desenharGrafico(labels, kwh, custos) {
+    function desenharGrafico(labels, kwhEst, kwhReal) {
         const ctx = document.getElementById('graficoHistorico');
         if (!ctx) return;
 
@@ -309,22 +419,20 @@
                 labels: labels,
                 datasets: [
                     {
-                        label: 'Consumo (kWh)',
-                        data: kwh,
+                        label: 'Consumo Estimado (kWh)',
+                        data: kwhEst,
                         backgroundColor: 'rgba(16, 185, 129, 0.7)',
                         borderColor: '#10b981',
                         borderWidth: 1,
-                        borderRadius: 6,
-                        yAxisID: 'y'
+                        borderRadius: 6
                     },
                     {
-                        label: 'Custo Total (R$)',
-                        data: custos,
-                        backgroundColor: 'rgba(251, 191, 36, 0.7)',
-                        borderColor: '#fbbf24',
+                        label: 'Consumo Real da Conta (kWh)',
+                        data: kwhReal,
+                        backgroundColor: 'rgba(56, 189, 248, 0.7)',
+                        borderColor: '#38bdf8',
                         borderWidth: 1,
-                        borderRadius: 6,
-                        yAxisID: 'y1'
+                        borderRadius: 6
                     }
                 ]
             },
@@ -337,20 +445,9 @@
                         grid: { display: false }
                     },
                     y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        ticks: { color: '#10b981' },
+                        ticks: { color: 'rgba(255,255,255,0.8)' },
                         grid: { color: 'rgba(255,255,255,0.05)' },
-                        title: { display: true, text: 'Consumo (kWh)', color: '#10b981' }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        ticks: { color: '#fbbf24' },
-                        grid: { drawOnChartArea: false },
-                        title: { display: true, text: 'Custo (R$)', color: '#fbbf24' }
+                        title: { display: true, text: 'Consumo em kWh', color: '#fff' }
                     }
                 },
                 plugins: {
@@ -361,7 +458,7 @@
     }
 
     async function removerHistorico(id) {
-        if (confirm("Deseja apagar este registro do histórico?")) {
+        if (confirm("Deseja apagar esta competência do histórico?")) {
             await client.from('historico_mensal').delete().eq('id', id);
             fetchHistorico();
         }
