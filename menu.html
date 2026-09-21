@@ -50,6 +50,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            text-decoration: none;
         }
 
         .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.1); color: white; }
@@ -107,6 +108,8 @@
         <h2>Gestão de Consumo</h2>
         <div class="menu-item active" onclick="switchTab('inicio', this)">🏠 Painel Geral</div>
         <div class="menu-item" onclick="switchTab('simulador', this)">⚡ Minha Residência</div>
+        <!-- Link para a página dedicada do histórico -->
+        <a href="historico.html" class="menu-item">📊 Histórico Mensal</a>
         <div class="menu-item" onclick="switchTab('config', this)">⚙️ Configurações</div>
         <button class="logout-btn" onclick="handleLogout()">Sair do Sistema</button>
     </nav>
@@ -193,7 +196,8 @@
     </main>
 </div>  
 
-<script>  // BANCO DE DADOS
+<script>
+    // BANCO DE DADOS
     const SUPABASE_URL = "https://srwhournhfadlwbixkxt.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyd2hvdXJuaGZhZGx3Yml4a3h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDMwNTIsImV4cCI6MjA5MDAxOTA1Mn0.HRt-0Rs9-FQxnywBlgOwnP7PO0ea7W7F26Zqlz-whow";
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -232,7 +236,6 @@
     // CLIMA 
     async function buscarClimaOpenMeteo(cidadeNome) {
         try {
-            // cep
             const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cidadeNome)}&count=1&language=pt&format=json`);
             const geoData = await geoRes.json();
 
@@ -244,7 +247,6 @@
             const { latitude, longitude, name } = geoData.results[0];
             document.getElementById("txt-cidade").innerText = name;
 
-            //  buscamos o clima 
             const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto`);
             const weatherData = await weatherRes.json();
 
@@ -252,13 +254,11 @@
             const humidity = weatherData.current.relative_humidity_2m;
             const code = weatherData.current.weather_code;
 
-            // Atualiza Interface
             document.getElementById("temp-valor").innerText = `${temp.toFixed(1)}°C`;
             document.getElementById("temp-desc").innerText = interpretarWeatherCode(code) + ` | UR: ${humidity}%`;
 
-            // alerta de temperatura
             const alerta = document.getElementById("alerta-sos");
-            if(temp < 23) {
+            if (temp < 23) {
                 alerta.style.display = "block";
                 document.getElementById("msg-sos").innerText = `Está fazendo ${temp}°C em ${name}. Abra as janelas e evite ligar o ar-condicionado ou ventiladores para reduzir o custo do mês!`;
             } else { 
@@ -271,7 +271,6 @@
         }
     }
 
-    // códigos da Open-Meteo
     function interpretarWeatherCode(code) {
         if (code === 0) return "Céu limpo";
         if (code <= 3) return "Parcialmente nublado";
@@ -297,16 +296,17 @@
         await client.from('equipamentos').insert([{ 
             user_id: session.user.id, nome, watts, qtd, horas: tempoTotalHoras, dias 
         }]);
-        fetchEquipamentos(); clearInputs();
+        fetchEquipamentos(); 
+        clearInputs();
     }
 
     async function fetchEquipamentos() {
         const { data, error } = await client.from('equipamentos').select('*');
-        if (!error) renderTable(data);
+        if (!error) renderTable(data || []);
     }
 
     async function removeItem(id) {
-        if(confirm("Remover item?")) {
+        if (confirm("Remover item?")) {
             await client.from('equipamentos').delete().eq('id', id);
             fetchEquipamentos();
         }
@@ -338,7 +338,7 @@
         document.getElementById("resumo-preco").innerText = (totalKwh * tarifaFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
-    // cep
+    // CEP E CONFIGURAÇÃO
     async function buscarCidadePorCEP() {
         const cep = document.getElementById("cfg-cep").value.replace(/\D/g, '');
         if (cep.length !== 8) return alert("Digite um CEP válido!");

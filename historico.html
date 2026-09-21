@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico de Consumo - Gestão Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #9333ea;
+            --accent: #10b981;
+            --warning: #fbbf24;
+            --danger: #ef4444;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+        body {
+            height: 100vh;
+            background: linear-gradient(135deg, #0f172a, #1e1b4b);
+            display: flex;
+            color: white;
+            overflow: hidden;
+        }
+
+        /* BARRA LATERAL */
+        .sidebar {
+            width: 280px;
+            min-width: 280px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            padding: 30px 20px;
+            height: 100vh;
+        }
+
+        .sidebar h2 { margin-bottom: 40px; text-align: center; color: var(--accent); font-size: 1.5rem; }
+
+        .menu-item {
+            padding: 14px 18px;
+            margin-bottom: 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: rgba(255,255,255,0.6);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.1); color: white; }
+        .menu-item.active { border-left: 4px solid var(--accent); background: rgba(16, 185, 129, 0.1); }
+
+        .main-content { 
+            flex: 1; 
+            padding: 40px; 
+            overflow-y: auto; 
+            height: 100vh;
+            background: rgba(0,0,0,0.2); 
+        }
+
+        .main-content::-webkit-scrollbar { width: 8px; }
+        .main-content::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        .main-content::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
+
+        .card { 
+            background: var(--glass); 
+            padding: 25px; 
+            border-radius: 20px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            margin-bottom: 25px; 
+        }
+
+        input {
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.3);
+            color: white;
+            outline: none;
+        }
+
+        button { 
+            cursor: pointer; 
+            border: none; 
+            border-radius: 10px; 
+            font-weight: bold; 
+            transition: 0.3s; 
+        }
+
+        .btn-salvar { background: var(--accent); color: white; padding: 10px 20px; }
+        .btn-salvar:hover { opacity: 0.9; }
+
+        .table-container { margin-top: 15px; border-radius: 15px; overflow: hidden; background: rgba(0,0,0,0.2); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: rgba(255,255,255,0.05); padding: 15px; text-align: left; font-size: 0.85rem; color: var(--accent); }
+        td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
+        .delete-btn { background: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; }
+
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        #app { display: none; width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <nav class="sidebar">
+        <h2>Gestão de Consumo</h2>
+        <a href="menu.html" class="menu-item">🏠 Painel Geral</a>
+        <a href="menu.html" class="menu-item">⚡ Minha Residência</a>
+        <a href="historico.html" class="menu-item active">📊 Histórico & Gráficos</a>
+        <a href="menu.html" class="menu-item">⚙️ Configurações</a>
+    </nav>
+
+    <main class="main-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;">
+            <div>
+                <h1>Relatório & Evolução Mensal</h1>
+                <p style="opacity: 0.7; font-size: 0.9rem; margin-top: 4px;">Acompanhe o consumo e histórico de custos ao longo dos meses.</p>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="month" id="hist-competencia">
+                <button class="btn-salvar" onclick="fecharMesComEquipamentos()">💾 Fechar Mês Atual</button>
+            </div>
+        </div>
+
+        <!-- CARDS DE METRICAS GERAIS -->
+        <div class="grid-cards">
+            <div class="card">
+                <span style="opacity: 0.7;">Média Mensal (kWh)</span>
+                <h2 id="metrica-media-kwh" style="font-size: 2rem; color: var(--accent); margin-top: 8px;">0.00 kWh</h2>
+            </div>
+            <div class="card">
+                <span style="opacity: 0.7;">Média Mensal (R$)</span>
+                <h2 id="metrica-media-custo" style="font-size: 2rem; color: var(--warning); margin-top: 8px;">R$ 0,00</h2>
+            </div>
+            <div class="card">
+                <span style="opacity: 0.7;">Meses Registrados</span>
+                <h2 id="metrica-total-meses" style="font-size: 2rem; margin-top: 8px;">0</h2>
+            </div>
+        </div>
+
+        <!-- GRÁFICO -->
+        <div class="card">
+            <h3 style="margin-bottom: 15px;">Evolução de Consumo e Gastos</h3>
+            <div style="position: relative; height: 320px; width: 100%;">
+                <canvas id="graficoHistorico"></canvas>
+            </div>
+        </div>
+
+        <!-- TABELA -->
+        <div class="card">
+            <h3>Tabela Detalhada de Fechamentos</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mês / Ano</th>
+                            <th>Consumo (kWh)</th>
+                            <th>Custo Total (R$)</th>
+                            <th>Tarifa Aplicada (R$/kWh)</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-historico-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://srwhournhfadlwbixkxt.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyd2hvdXJuaGZhZGx3Yml4a3h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDMwNTIsImV4cCI6MjA5MDAxOTA1Mn0.HRt-0Rs9-FQxnywBlgOwnP7PO0ea7W7F26Zqlz-whow";
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let chartInstancia = null;
+
+    async function checkUser() {
+        const { data: { session } } = await client.auth.getSession();
+        if (!session) {
+            window.location.href = "index.html";
+        } else {
+            document.getElementById("app").style.display = "flex";
+
+            const hoje = new Date();
+            const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+            document.getElementById("hist-competencia").value = mesAtual;
+
+            fetchHistorico();
+        }
+    }
+
+    // Calcula o consumo atual da residência e grava no histórico
+    async function fecharMesComEquipamentos() {
+        const { data: { session } } = await client.auth.getSession();
+        if (!session) return;
+
+        const mesEscolhido = document.getElementById("hist-competencia").value;
+        if (!mesEscolhido) return alert("Selecione o mês/ano!");
+
+        // Busca os aparelhos do usuário para calcular a soma
+        const { data: equipamentos, error: errEq } = await client.from('equipamentos').select('*');
+        if (errEq || !equipamentos || equipamentos.length === 0) {
+            return alert("Nenhum equipamento cadastrado para calcular o mês!");
+        }
+
+        const tarifaBase = parseFloat(localStorage.getItem('tarifa_energia')) || 0.92;
+        const adicionalBandeira = parseFloat(localStorage.getItem('adicional_bandeira')) || 0;
+        const tarifaFinal = tarifaBase + adicionalBandeira;
+
+        let totalKwh = 0;
+        equipamentos.forEach(item => {
+            totalKwh += (item.watts * item.qtd * item.horas * item.dias) / 1000;
+        });
+
+        const custoTotal = totalKwh * tarifaFinal;
+
+        const { error } = await client.from('historico_mensal').upsert({
+            user_id: session.user.id,
+            mes_ano: mesEscolhido,
+            consumo_kwh: Number(totalKwh.toFixed(2)),
+            custo_total: Number(custoTotal.toFixed(2)),
+            tarifa_aplicada: Number(tarifaFinal.toFixed(4))
+        }, { onConflict: 'user_id,mes_ano' });
+
+        if (error) {
+            alert("Erro ao gravar histórico: " + error.message);
+        } else {
+            alert(`Competência ${mesEscolhido} fechada com sucesso!`);
+            fetchHistorico();
+        }
+    }
+
+    async function fetchHistorico() {
+        const { data, error } = await client
+            .from('historico_mensal')
+            .select('*')
+            .order('mes_ano', { ascending: true });
+
+        if (!error && data) {
+            renderizarHistorico(data);
+        }
+    }
+
+    function renderizarHistorico(registros) {
+        const tbody = document.getElementById("table-historico-body");
+        tbody.innerHTML = "";
+
+        const labels = [];
+        const dataKwh = [];
+        const dataCusto = [];
+
+        let somaKwh = 0;
+        let somaCusto = 0;
+
+        registros.forEach(item => {
+            labels.push(item.mes_ano);
+            dataKwh.push(item.consumo_kwh);
+            dataCusto.push(item.custo_total);
+
+            somaKwh += Number(item.consumo_kwh);
+            somaCusto += Number(item.custo_total);
+
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${item.mes_ano}</strong></td>
+                    <td>${Number(item.consumo_kwh).toFixed(2)} kWh</td>
+                    <td>R$ ${Number(item.custo_total).toFixed(2)}</td>
+                    <td>R$ ${Number(item.tarifa_aplicada || 0).toFixed(4)}</td>
+                    <td><button class="delete-btn" onclick="removerHistorico('${item.id}')">🗑️</button></td>
+                </tr>
+            `;
+        });
+
+        const totalMeses = registros.length;
+        document.getElementById("metrica-total-meses").innerText = totalMeses;
+        document.getElementById("metrica-media-kwh").innerText = totalMeses > 0 
+            ? `${(somaKwh / totalMeses).toFixed(2)} kWh` 
+            : "0.00 kWh";
+        document.getElementById("metrica-media-custo").innerText = totalMeses > 0 
+            ? (somaCusto / totalMeses).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) 
+            : "R$ 0,00";
+
+        desenharGrafico(labels, dataKwh, dataCusto);
+    }
+
+    function desenharGrafico(labels, kwh, custos) {
+        const ctx = document.getElementById('graficoHistorico');
+        if (!ctx) return;
+
+        if (chartInstancia) chartInstancia.destroy();
+
+        chartInstancia = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Consumo (kWh)',
+                        data: kwh,
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        borderColor: '#10b981',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Custo Total (R$)',
+                        data: custos,
+                        backgroundColor: 'rgba(251, 191, 36, 0.7)',
+                        borderColor: '#fbbf24',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: { color: 'rgba(255,255,255,0.8)' },
+                        grid: { display: false }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        ticks: { color: '#10b981' },
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        title: { display: true, text: 'Consumo (kWh)', color: '#10b981' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        ticks: { color: '#fbbf24' },
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Custo (R$)', color: '#fbbf24' }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#fff' } }
+                }
+            }
+        });
+    }
+
+    async function removerHistorico(id) {
+        if (confirm("Deseja apagar este registro do histórico?")) {
+            await client.from('historico_mensal').delete().eq('id', id);
+            fetchHistorico();
+        }
+    }
+
+    window.onload = checkUser;
+</script>
+</body>
+</html>
