@@ -135,7 +135,7 @@
 
         .grid-cards {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 20px;
             margin-bottom: 25px;
         }
@@ -185,17 +185,12 @@
             </div>
         </div>
 
-        <!-- CARDS DE METRICAS GERAIS -->
+        <!-- CARDS DE MÉTRICAS GERAIS -->
         <div class="grid-cards">
             <div class="card">
                 <span style="opacity: 0.7;">Média Estimada vs Real</span>
                 <h2 id="metrica-media-kwh" style="font-size: 1.8rem; color: var(--accent); margin-top: 8px;">-- / --</h2>
                 <small style="opacity: 0.6;">kWh simulado vs real</small>
-            </div>
-            <div class="card">
-                <span style="opacity: 0.7;">Tarifa Média Efetiva Real</span>
-                <h2 id="metrica-tarifa-efetiva" style="font-size: 1.8rem; color: var(--real); margin-top: 8px;">R$ 0,00/kWh</h2>
-                <small style="opacity: 0.6;">Com todos impostos e taxas</small>
             </div>
             <div class="card">
                 <span style="opacity: 0.7;">Meses Fechados</span>
@@ -224,7 +219,6 @@
                             <th>Real (kWh)</th>
                             <th>Desvio (kWh)</th>
                             <th>Valor Pago (R$)</th>
-                            <th>Tarifa Real (R$/kWh)</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -348,7 +342,6 @@
 
         let somaKwhEstimado = 0;
         let somaKwhReal = 0;
-        let totalTarifaEfetiva = 0;
         let qtdComReal = 0;
 
         registros.forEach(item => {
@@ -359,7 +352,6 @@
             somaKwhEstimado += Number(item.consumo_kwh || 0);
             
             let desvioHtml = "<span style='opacity: 0.5;'>--</span>";
-            let tarifaRealHtml = "<span style='opacity: 0.5;'>--</span>";
 
             if (item.kwh_real) {
                 somaKwhReal += Number(item.kwh_real);
@@ -371,12 +363,6 @@
                     const badgeClass = diff > 0 ? "diff-plus" : "diff-minus";
                     desvioHtml = `<span class="badge-diff ${badgeClass}">${sinal}${diff.toFixed(1)} kWh</span>`;
                 }
-
-                if (item.custo_real && item.kwh_real > 0) {
-                    const tarifaEfetiva = item.custo_real / item.kwh_real;
-                    totalTarifaEfetiva += tarifaEfetiva;
-                    tarifaRealHtml = `R$ ${tarifaEfetiva.toFixed(3)}`;
-                }
             }
 
             tbody.innerHTML += `
@@ -386,7 +372,6 @@
                     <td style="color: var(--real); font-weight: bold;">${item.kwh_real ? Number(item.kwh_real).toFixed(1) + ' kWh' : '--'}</td>
                     <td>${desvioHtml}</td>
                     <td>${item.custo_real ? 'R$ ' + Number(item.custo_real).toFixed(2) : '--'}</td>
-                    <td>${tarifaRealHtml}</td>
                     <td><button class="delete-btn" onclick="removerHistorico('${item.id}')">🗑️</button></td>
                 </tr>
             `;
@@ -398,11 +383,6 @@
         const mediaEst = total > 0 ? (somaKwhEstimado / total).toFixed(0) : "0";
         const mediaReal = qtdComReal > 0 ? (somaKwhReal / qtdComReal).toFixed(0) : "--";
         document.getElementById("metrica-media-kwh").innerText = `${mediaEst} / ${mediaReal} kWh`;
-
-        const tarifaEfetivaMedia = qtdComReal > 0 ? (totalTarifaEfetiva / qtdComReal) : 0;
-        document.getElementById("metrica-tarifa-efetiva").innerText = tarifaEfetivaMedia > 0 
-            ? `R$ ${tarifaEfetivaMedia.toFixed(3)}/kWh` 
-            : "R$ 0,00/kWh";
 
         desenharGrafico(labels, dataKwhEstimado, dataKwhReal);
     }
