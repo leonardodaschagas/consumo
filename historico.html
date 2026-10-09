@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Histórico & Auditoria de Fatura - Gestão Pro</title>
+    <!-- Bibliotecas externas: Supabase e Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -17,7 +18,12 @@
             --glass: rgba(255, 255, 255, 0.05);
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+        }
 
         body {
             height: 100vh;
@@ -40,7 +46,12 @@
             height: 100vh;
         }
 
-        .sidebar h2 { margin-bottom: 40px; text-align: center; color: var(--accent); font-size: 1.5rem; }
+        .sidebar h2 { 
+            margin-bottom: 40px; 
+            text-align: center; 
+            color: var(--accent); 
+            font-size: 1.5rem; 
+        }
 
         .menu-item {
             padding: 14px 18px;
@@ -53,11 +64,20 @@
             align-items: center;
             gap: 12px;
             text-decoration: none;
+            font-size: 0.95rem;
         }
 
-        .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.1); color: white; }
-        .menu-item.active { border-left: 4px solid var(--accent); background: rgba(16, 185, 129, 0.1); }
+        .menu-item:hover, .menu-item.active { 
+            background: rgba(255,255,255,0.1); 
+            color: white; 
+        }
 
+        .menu-item.active { 
+            border-left: 4px solid var(--accent); 
+            background: rgba(16, 185, 129, 0.1); 
+        }
+
+        /* ÁREA PRINCIPAL */
         .main-content { 
             flex: 1; 
             padding: 40px; 
@@ -78,28 +98,265 @@
             margin-bottom: 25px; 
         }
 
-        .inputs-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            align-items: flex-end;
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+            margin-bottom: 25px;
         }
 
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
+        .summary-card {
+            background: var(--glass);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
         }
 
-        .input-group label {
+        .summary-card span {
             font-size: 0.85rem;
-            opacity: 0.8;
+            opacity: 0.7;
         }
 
-        input {
-            padding: 10px 14px;
-            border-radius: 10px;
-            border: 1px solid rgba(255,255,255,0.1);
-            background: rgba(0,0,0,0.3);
-            color: white;
-            outline: none
+        .summary-card h2 {
+            font-size: 1.8rem;
+            margin-top: 8px;
+        }
+
+        /* TABELA */
+        .table-container { 
+            margin-top: 20px; 
+            border-radius: 15px; 
+            overflow: hidden; 
+            background: rgba(0,0,0,0.2); 
+        }
+
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+
+        th { 
+            background: rgba(255,255,255,0.05); 
+            padding: 15px; 
+            text-align: left; 
+            font-size: 0.85rem; 
+            color: var(--accent); 
+        }
+
+        td { 
+            padding: 15px; 
+            border-bottom: 1px solid rgba(255,255,255,0.05); 
+            font-size: 0.9rem; 
+        }
+
+        .logout-btn { 
+            margin-top: auto; 
+            background: var(--danger); 
+            color: white; 
+            padding: 12px; 
+            border: none;
+            border-radius: 10px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            opacity: 0.8;
+            transition: 0.3s;
+        }
+
+        .logout-btn:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <h2>Gestão Pro</h2>
+        <a href="menu.html" class="menu-item">🏠 Painel Geral</a>
+        <a href="historico.html" class="menu-item active">📊 Histórico & Auditoria</a>
+        <button class="logout-btn" onclick="handleLogout()">Sair do Sistema</button>
+    </nav>
+
+    <main class="main-content">
+        <h1>Histórico & Auditoria de Consumo</h1>
+
+        <!-- RESUMO DOS TOTAIS -->
+        <div class="summary-grid">
+            <div class="summary-card">
+                <span>Total de Itens</span>
+                <h2 id="total-itens" style="color: var(--real);">0</h2>
+            </div>
+            <div class="summary-card">
+                <span>Consumo Total Mensal</span>
+                <h2 id="total-kwh" style="color: var(--accent);">0.00 kWh</h2>
+            </div>
+            <div class="summary-card">
+                <span>Custo Total Estimado</span>
+                <h2 id="total-custo" style="color: var(--warning);">R$ 0,00</h2>
+            </div>
+        </div>
+
+        <!-- GRÁFICO DE BARRAS -->
+        <div class="card">
+            <h3>Distribuição de Consumo por Equipamento (kWh/mês)</h3>
+            <div style="margin-top: 20px; position: relative; height: 320px;">
+                <canvas id="chartConsumo"></canvas>
+            </div>
+        </div>
+
+        <!-- TABELA DE AUDITORIA -->
+        <div class="card">
+            <h3>Relatório Detalhado de Aparelhos</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Equipamento</th>
+                            <th>Potência Unitária</th>
+                            <th>Quantidade</th>
+                            <th>Uso Diário</th>
+                            <th>Dias/Mês</th>
+                            <th>Consumo Mensal</th>
+                            <th>Custo Mensal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-corpo">
+                        <tr>
+                            <td colspan="7" style="text-align: center; opacity: 0.6;">A carregar dados...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // CONFIGURAÇÕES DO SUPABASE
+        const SUPABASE_URL = "https://srwhournhfadlwbixkxt.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyd2hvdXJuaGZhZGx3Yml4a3h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDMwNTIsImV4cCI6MjA5MDAxOTA1Mn0.HRt-0Rs9-FQxnywBlgOwnP7PO0ea7W7F26Zqlz-whow";
+        const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let chartInstancia = null;
+
+        // VERIFICA SESSÃO DO UTILIZADOR
+        async function checkAuth() {
+            const { data: { session } } = await client.auth.getSession();
+            if (!session) {
+                window.location.href = "index.html";
+                return;
+            }
+            carregarHistorico();
+        }
+
+        // CARREGA E PROCESSA OS DADOS DA BASE DE DADOS
+        async function carregarHistorico() {
+            const tarifaBase = parseFloat(localStorage.getItem('tarifa_energia')) || 0.92;
+            const tarifaAdicional = parseFloat(localStorage.getItem('adicional_bandeira')) || 0;
+            const tarifaFinal = tarifaBase + tarifaAdicional;
+
+            const { data, error } = await client.from('equipamentos').select('*');
+
+            if (error) {
+                console.error("Erro ao procurar dados no Supabase:", error);
+                alert("Ocorreu um erro ao carregar os registos.");
+                return;
+            }
+
+            let consumoTotalGeral = 0;
+            const labels = [];
+            const valoresKwh = [];
+            const tbody = document.getElementById("tabela-corpo");
+            tbody.innerHTML = "";
+
+            if (!data || data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; opacity: 0.6;">Nenhum equipamento registado até ao momento.</td></tr>`;
+                document.getElementById("total-itens").innerText = "0";
+                document.getElementById("total-kwh").innerText = "0.00 kWh";
+                document.getElementById("total-custo").innerText = "R$ 0,00";
+                return;
+            }
+
+            data.forEach(item => {
+                const consumoMensal = (item.watts * item.qtd * item.horas * item.dias) / 1000;
+                const custoMensal = consumoMensal * tarifaFinal;
+                consumoTotalGeral += consumoMensal;
+
+                labels.push(item.nome);
+                valoresKwh.push(consumoMensal.toFixed(2));
+
+                const horasInt = Math.floor(item.horas);
+                const minutosInt = Math.round((item.horas % 1) * 60);
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${item.nome}</strong></td>
+                        <td>${item.watts} W</td>
+                        <td>${item.qtd}</td>
+                        <td>${horasInt}h ${minutosInt}m</td>
+                        <td>${item.dias} dias</td>
+                        <td>${consumoMensal.toFixed(2)} kWh</td>
+                        <td style="color: var(--accent); font-weight: bold;">R$ ${custoMensal.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            // Atualiza os cartões superiores
+            document.getElementById("total-itens").innerText = data.length;
+            document.getElementById("total-kwh").innerText = `${consumoTotalGeral.toFixed(2)} kWh`;
+            document.getElementById("total-custo").innerText = (consumoTotalGeral * tarifaFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+            renderizarGrafico(labels, valoresKwh);
+        }
+
+        // GERA O GRÁFICO COM CHART.JS
+        function renderizarGrafico(labels, valores) {
+            const ctx = document.getElementById('chartConsumo').getContext('2d');
+
+            if (chartInstancia) {
+                chartInstancia.destroy();
+            }
+
+            chartInstancia = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Consumo Mensal (kWh)',
+                        data: valores,
+                        backgroundColor: '#10b981',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        x: {
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#ffffff' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // TERMINAR SESSÃO
+        async function handleLogout() {
+            await client.auth.signOut();
+            window.location.href = "index.html";
+        }
+
+        window.onload = checkAuth;
+    </script>
+</body>
+</html>
