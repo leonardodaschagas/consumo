@@ -1,85 +1,88 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<title>Auth Moderno</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auth Moderno - Gestão Pro</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
-<style>
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Segoe UI', sans-serif;
-  }
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
 
-  body {
-    height: 100vh;
-    background: linear-gradient(135deg, #0f172a, #1a502f);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+    body {
+      height: 100vh;
+      background: linear-gradient(135deg, #4f46e5, #9333ea);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-  .card {
-    background: rgba(255,255,255,0.1);
-    backdrop-filter: blur(20px);
-    padding: 40px;
-    border-radius: 20px;
-    width: 320px;
-    color: white;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    animation: fadeIn 0.8s ease;
-  }
+    .card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      padding: 40px;
+      border-radius: 20px;
+      width: 320px;
+      color: white;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      animation: fadeIn 0.8s ease;
+    }
 
-  h2 {
-    text-align: center;
-    margin-bottom: 20px;
-  }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
 
-  input {
-    width: 100%;
-    padding: 12px;
-    margin: 8px 0;
-    border: none;
-    border-radius: 10px;
-    outline: none;
-  }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      outline: none;
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+    }
 
-  button {
-    width: 100%;
-    padding: 12px;
-    margin-top: 10px;
-    border: none;
-    border-radius: 10px;
-    background: #fff;
-    color: #4f46e5;
-    font-weight: bold;
-    cursor: pointer;
-    transition: 0.3s;
-  }
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 10px;
+      background: #fff;
+      color: #4f46e5;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+    }
 
-  button:hover {
-    background: #ddd;
-  }
+    button:hover {
+      background: #ddd;
+    }
 
-  .switch {
-    text-align: center;
-    margin-top: 15px;
-    cursor: pointer;
-    font-size: 14px;
-    opacity: 0.8;
-  }
+    .switch {
+      text-align: center;
+      margin-top: 15px;
+      cursor: pointer;
+      font-size: 14px;
+      opacity: 0.8;
+    }
 
-  .switch:hover {
-    opacity: 1;
-  }
+    .switch:hover {
+      opacity: 1;
+    }
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px);}
-    to { opacity: 1; transform: translateY(0);}
-  }
-</style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 
 <body>
@@ -87,19 +90,19 @@
 <div class="card">
   <h2 id="title">Login</h2>
 
-  <input type="email" id="email" placeholder="Email">
-  <input type="password" id="password" placeholder="Senha">
+  <input type="email" id="email" placeholder="E-mail">
+  <input type="password" id="password" placeholder="Palavra-passe">
 
   <button onclick="handleAuth()">Entrar</button>
 
   <div class="switch" onclick="toggleMode()">
-    Não tem conta? Cadastre-se
+    Não tem conta? Registe-se
   </div>
 </div>
 
 <script>
   const SUPABASE_URL = "https://srwhournhfadlwbixkxt.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_Dax00kNBagvtTLdIZWBPLA_qYlAQsfL";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyd2hvdXJuaGZhZGx3Yml4a3h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDMwNTIsImV4cCI6MjA5MDAxOTA1Mn0.HRt-0Rs9-FQxnywBlgOwnP7PO0ea7W7F26Zqlz-whow";
 
   const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -109,34 +112,39 @@
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
+    if (!email || !password) {
+      return alert("Preencha todos os campos!");
+    }
+
     if (isLogin) {
       const { error } = await client.auth.signInWithPassword({
         email, password
       });
 
-      if (error) alert(error.message);
-      else {
-        alert("Login feito!");
+      if (error) {
+        alert(error.message);
+      } else {
         window.location.href = "menu.html";
       }
-
     } else {
       const { error } = await client.auth.signUp({
         email, password
       });
 
-      if (error) alert(error.message);
-      else alert("Conta criada! Verifique seu email.");
+      if (error) {
+        alert(error.message);
+      } else {
+        alert("Conta criada com sucesso! Verifique o seu e-mail.");
+      }
     }
   }
 
   function toggleMode() {
     isLogin = !isLogin;
-
-    document.getElementById("title").innerText = isLogin ? "Login" : "Cadastro";
-    document.querySelector("button").innerText = isLogin ? "Entrar" : "Cadastrar";
+    document.getElementById("title").innerText = isLogin ? "Login" : "Registo";
+    document.querySelector("button").innerText = isLogin ? "Entrar" : "Registar";
     document.querySelector(".switch").innerText = isLogin 
-      ? "Não tem conta? Cadastre-se" 
+      ? "Não tem conta? Registe-se" 
       : "Já tem conta? Fazer login";
   }
 </script>

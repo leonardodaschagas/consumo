@@ -51,6 +51,7 @@
             align-items: center;
             gap: 12px;
             text-decoration: none;
+            font-size: 0.95rem;
         }
 
         .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.1); color: white; }
@@ -96,7 +97,7 @@
         table { width: 100%; border-collapse: collapse; }
         th { background: rgba(255,255,255,0.05); padding: 15px; text-align: left; font-size: 0.85rem; color: var(--accent); }
         td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
-        .delete-btn { background: none; color: var(--danger); font-size: 1.2rem; }
+        .delete-btn { background: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; }
 
         #app { display: none; width: 100%; height: 100%; }
     </style>
@@ -108,17 +109,17 @@
         <h2>Gestão de Consumo</h2>
         <div class="menu-item active" onclick="switchTab('inicio', this)">🏠 Painel Geral</div>
         <div class="menu-item" onclick="switchTab('simulador', this)">⚡ Minha Residência</div>
-        <!-- Link para a página dedicada do histórico -->
-        <a href="historico.html" class="menu-item">📊 Histórico Mensal</a>
+        <a href="historico.html" class="menu-item">📊 Histórico & Auditoria</a>
         <div class="menu-item" onclick="switchTab('config', this)">⚙️ Configurações</div>
         <button class="logout-btn" onclick="handleLogout()">Sair do Sistema</button>
     </nav>
 
     <main class="main-content">
+        <!-- PAINEL GERAL -->
         <section id="sec-inicio" class="content-section active">
             <h1>Bem-vindo, <span id="user-name" style="color: var(--accent);">...</span></h1>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 30px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-top: 30px;">
                 <div class="card">
                     <span style="opacity: 0.7;">Consumo Total (Mês)</span>
                     <h2 id="resumo-kwh" style="font-size: 2.2rem; margin-top: 10px;">0.00 kWh</h2>
@@ -140,6 +141,7 @@
             </div>
         </section>
 
+        <!-- SIMULADOR / EQUIPAMENTOS -->
         <section id="sec-simulador" class="content-section">
             <h1>Cadastrar Equipamentos</h1>
             <div class="card">
@@ -170,6 +172,7 @@
             </div>
         </section>
 
+        <!-- CONFIGURAÇÕES -->
         <section id="sec-config" class="content-section">
             <h1>Configurações</h1>
             <div class="card" style="max-width: 450px;">
@@ -180,7 +183,7 @@
                 <select id="cfg-bandeira">
                     <option value="0">🟢 Bandeira Verde (Sem adicional)</option>
                     <option value="0.01884">🟡 Bandeira Amarela (+ R$ 0,018 por kWh)</option>
-                    <option value="0.04463">🔴 Bandeira Vermelha (+ R$ 0,44 por kWh)</option>
+                    <option value="0.04463">🔴 Bandeira Vermelha (+ R$ 0,044 por kWh)</option>
                 </select>
 
                 <label style="display: block; margin-top: 15px;">Localização (CEP)</label>
@@ -197,7 +200,6 @@
 </div>  
 
 <script>
-    // BANCO DE DADOS
     const SUPABASE_URL = "https://srwhournhfadlwbixkxt.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyd2hvdXJuaGZhZGx3Yml4a3h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDMwNTIsImV4cCI6MjA5MDAxOTA1Mn0.HRt-0Rs9-FQxnywBlgOwnP7PO0ea7W7F26Zqlz-whow";
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -226,6 +228,8 @@
             if (document.getElementById("cfg-cidade")) {
                 document.getElementById("cfg-cidade").value = cidadeSalva || "";
                 document.getElementById("cfg-cep").value = cepSalvo || "";
+                document.getElementById("cfg-tarifa").value = tarifaAtual;
+                document.getElementById("cfg-bandeira").value = adicionalBandeira;
             }
             
             if (cidadeSalva) buscarClimaOpenMeteo(cidadeSalva);
@@ -233,7 +237,6 @@
         }
     }
 
-    // CLIMA 
     async function buscarClimaOpenMeteo(cidadeNome) {
         try {
             const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cidadeNome)}&count=1&language=pt&format=json`);
@@ -260,13 +263,12 @@
             const alerta = document.getElementById("alerta-sos");
             if (temp < 23) {
                 alerta.style.display = "block";
-                document.getElementById("msg-sos").innerText = `Está fazendo ${temp}°C em ${name}. Abra as janelas e evite ligar o ar-condicionado ou ventiladores para reduzir o custo do mês!`;
+                document.getElementById("msg-sos").innerText = `Está a fazer ${temp}°C em ${name}. Abra as janelas e evite ligar o ar-condicionado ou ventiladores para poupar energia!`;
             } else { 
                 alerta.style.display = "none"; 
             }
-
         } catch (e) {
-            console.error("Erro ao buscar clima:", e);
+            console.error("Erro ao procurar clima:", e);
             document.getElementById("temp-desc").innerText = "Erro ao carregar clima";
         }
     }
@@ -275,38 +277,42 @@
         if (code === 0) return "Céu limpo";
         if (code <= 3) return "Parcialmente nublado";
         if (code <= 48) return "Nevoeiro";
-        if (code <= 67) return "Chuva leve";
-        if (code <= 82) return "Pancadas de chuva";
+        if (code <= 67) return "Chuva fraca";
+        if (code <= 82) return "Aguaceiros";
         return "Instável";
     }
 
-    // SUPABASE E TABELA
     async function addItem() {
         const { data: { session } } = await client.auth.getSession();
-        const nome = document.getElementById("inp-nome").value;
+        const nome = document.getElementById("inp-nome").value.trim();
         const watts = parseFloat(document.getElementById("inp-watts").value);
         const qtd = parseInt(document.getElementById("inp-qtd").value);
         const h = parseInt(document.getElementById("inp-horas").value) || 0;
         const m = parseInt(document.getElementById("inp-minutos").value) || 0;
         const dias = parseFloat(document.getElementById("inp-dias").value);
 
-        if (!nome || isNaN(watts)) return alert("Preencha os dados!");
+        if (!nome || isNaN(watts) || isNaN(qtd) || isNaN(dias)) return alert("Preencha todos os campos obrigatórios!");
 
         const tempoTotalHoras = h + (m / 60);
-        await client.from('equipamentos').insert([{ 
+        const { error } = await client.from('equipamentos').insert([{ 
             user_id: session.user.id, nome, watts, qtd, horas: tempoTotalHoras, dias 
         }]);
-        fetchEquipamentos(); 
-        clearInputs();
+
+        if (error) {
+            alert("Erro ao guardar equipamento: " + error.message);
+        } else {
+            fetchEquipamentos();
+            clearInputs();
+        }
     }
 
     async function fetchEquipamentos() {
         const { data, error } = await client.from('equipamentos').select('*');
-        if (!error) renderTable(data || []);
+        if (!error && data) renderTable(data);
     }
 
     async function removeItem(id) {
-        if (confirm("Remover item?")) {
+        if (confirm("Remover este equipamento?")) {
             await client.from('equipamentos').delete().eq('id', id);
             fetchEquipamentos();
         }
@@ -338,24 +344,26 @@
         document.getElementById("resumo-preco").innerText = (totalKwh * tarifaFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
-    // CEP E CONFIGURAÇÃO
     async function buscarCidadePorCEP() {
         const cep = document.getElementById("cfg-cep").value.replace(/\D/g, '');
-        if (cep.length !== 8) return alert("Digite um CEP válido!");
+        if (cep.length !== 8) return alert("Digite um CEP válido com 8 dígitos!");
 
         try {
             const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
             const data = await res.json();
-            if (data.erro) alert("CEP não encontrado!");
-            else {
+            if (data.erro) {
+                alert("CEP não encontrado!");
+            } else {
                 document.getElementById("cfg-cidade").value = `${data.localidade}`;
             }
-        } catch (e) { alert("Erro ao buscar CEP."); }
+        } catch (e) {
+            alert("Erro ao consultar o CEP.");
+        }
     }
 
     function saveConfig() {
-        tarifaAtual = parseFloat(document.getElementById("cfg-tarifa").value);
-        adicionalBandeira = parseFloat(document.getElementById("cfg-bandeira").value);
+        tarifaAtual = parseFloat(document.getElementById("cfg-tarifa").value) || 0.92;
+        adicionalBandeira = parseFloat(document.getElementById("cfg-bandeira").value) || 0;
         const cidade = document.getElementById("cfg-cidade").value;
         const cep = document.getElementById("cfg-cep").value;
         
@@ -366,12 +374,16 @@
         
         if (cidade) buscarClimaOpenMeteo(cidade);
         fetchEquipamentos();
-        alert("Configurações salvas!");
+        alert("Configurações gravadas com sucesso!");
     }
 
     function clearInputs() {
         document.getElementById("inp-nome").value = "";
         document.getElementById("inp-watts").value = "";
+        document.getElementById("inp-qtd").value = "1";
+        document.getElementById("inp-horas").value = "0";
+        document.getElementById("inp-minutos").value = "15";
+        document.getElementById("inp-dias").value = "30";
     }
 
     async function handleLogout() {
