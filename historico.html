@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Histórico & Auditoria de Fatura - Gestão Pro</title>
+    <!-- Bibliotecas externas: Supabase e Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -76,7 +77,7 @@
             background: rgba(16, 185, 129, 0.1); 
         }
 
-        /* CONTEÚDO */
+        /* ÁREA PRINCIPAL */
         .main-content { 
             flex: 1; 
             padding: 40px; 
@@ -122,6 +123,7 @@
             margin-top: 8px;
         }
 
+        /* TABELA */
         .table-container { 
             margin-top: 20px; 
             border-radius: 15px; 
@@ -178,10 +180,10 @@
     <main class="main-content">
         <h1>Histórico & Auditoria de Consumo</h1>
 
-        <!-- INDICADORES RESUMIDOS -->
+        <!-- RESUMO DOS TOTAIS -->
         <div class="summary-grid">
             <div class="summary-card">
-                <span>Total de Equipamentos</span>
+                <span>Total de Itens</span>
                 <h2 id="total-itens" style="color: var(--real);">0</h2>
             </div>
             <div class="summary-card">
@@ -194,7 +196,7 @@
             </div>
         </div>
 
-        <!-- GRÁFICO CHART.JS -->
+        <!-- GRÁFICO DE BARRAS -->
         <div class="card">
             <h3>Distribuição de Consumo por Equipamento (kWh/mês)</h3>
             <div style="margin-top: 20px; position: relative; height: 320px;">
@@ -202,9 +204,9 @@
             </div>
         </div>
 
-        <!-- TABELA DETALHADA -->
+        <!-- TABELA DE AUDITORIA -->
         <div class="card">
-            <h3>Auditoria Completa dos Aparelhos</h3>
+            <h3>Relatório Detalhado de Aparelhos</h3>
             <div class="table-container">
                 <table>
                     <thead>
@@ -229,12 +231,14 @@
     </main>
 
     <script>
+        // CONFIGURAÇÕES DO SUPABASE
         const SUPABASE_URL = "https://srwhournhfadlwbixkxt.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyd2hvdXJuaGZhZGx3Yml4a3h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDMwNTIsImV4cCI6MjA5MDAxOTA1Mn0.HRt-0Rs9-FQxnywBlgOwnP7PO0ea7W7F26Zqlz-whow";
         const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let chartInstancia = null;
 
+        // VERIFICA SESSÃO DO UTILIZADOR
         async function checkAuth() {
             const { data: { session } } = await client.auth.getSession();
             if (!session) {
@@ -244,6 +248,7 @@
             carregarHistorico();
         }
 
+        // CARREGA E PROCESSA OS DADOS DA BASE DE DADOS
         async function carregarHistorico() {
             const tarifaBase = parseFloat(localStorage.getItem('tarifa_energia')) || 0.92;
             const tarifaAdicional = parseFloat(localStorage.getItem('adicional_bandeira')) || 0;
@@ -252,8 +257,8 @@
             const { data, error } = await client.from('equipamentos').select('*');
 
             if (error) {
-                console.error("Erro ao carregar dados:", error);
-                alert("Erro ao carregar o histórico do Supabase.");
+                console.error("Erro ao procurar dados no Supabase:", error);
+                alert("Ocorreu um erro ao carregar os registos.");
                 return;
             }
 
@@ -295,6 +300,7 @@
                 `;
             });
 
+            // Atualiza os cartões superiores
             document.getElementById("total-itens").innerText = data.length;
             document.getElementById("total-kwh").innerText = `${consumoTotalGeral.toFixed(2)} kWh`;
             document.getElementById("total-custo").innerText = (consumoTotalGeral * tarifaFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -302,6 +308,7 @@
             renderizarGrafico(labels, valoresKwh);
         }
 
+        // GERA O GRÁFICO COM CHART.JS
         function renderizarGrafico(labels, valores) {
             const ctx = document.getElementById('chartConsumo').getContext('2d');
 
@@ -343,6 +350,7 @@
             });
         }
 
+        // TERMINAR SESSÃO
         async function handleLogout() {
             await client.auth.signOut();
             window.location.href = "index.html";
