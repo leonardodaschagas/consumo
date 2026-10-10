@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Histórico & Auditoria de Fatura - Gestão Pro</title>
-    <!-- Bibliotecas externas: Supabase e Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     <style>
         :root {
             --primary: #4f46e5;
@@ -18,170 +19,50 @@
             --glass: rgba(255, 255, 255, 0.05);
         }
 
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-            font-family: 'Segoe UI', system-ui, sans-serif; 
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
 
-        body {
-            height: 100vh;
-            background: linear-gradient(135deg, #0f172a, #1e1b4b);
-            display: flex;
-            color: white;
-            overflow: hidden;
-        }
+        body { height: 100vh; background: linear-gradient(135deg, #0f172a, #1e1b4b); display: flex; color: white; overflow: hidden; }
 
-        /* BARRA LATERAL */
-        .sidebar {
-            width: 280px;
-            min-width: 280px;
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            flex-direction: column;
-            padding: 30px 20px;
-            height: 100vh;
-        }
+        /* BARRA LATERAL RESTAURADA */
+        .sidebar { width: 280px; min-width: 280px; background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px); border-right: 1px solid rgba(255, 255, 255, 0.1); display: flex; flex-direction: column; padding: 30px 20px; height: 100vh; }
+        .sidebar h2 { margin-bottom: 40px; text-align: center; color: var(--accent); font-size: 1.5rem; }
+        .menu-item { padding: 14px 18px; margin-bottom: 10px; border-radius: 12px; cursor: pointer; transition: all 0.3s; color: rgba(255,255,255,0.6); display: flex; align-items: center; gap: 12px; text-decoration: none; font-size: 0.95rem; }
+        .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.1); color: white; }
+        .menu-item.active { border-left: 4px solid var(--accent); background: rgba(16, 185, 129, 0.1); }
 
-        .sidebar h2 { 
-            margin-bottom: 40px; 
-            text-align: center; 
-            color: var(--accent); 
-            font-size: 1.5rem; 
-        }
-
-        .menu-item {
-            padding: 14px 18px;
-            margin-bottom: 10px;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.3s;
-            color: rgba(255,255,255,0.6);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-            font-size: 0.95rem;
-        }
-
-        .menu-item:hover, .menu-item.active { 
-            background: rgba(255,255,255,0.1); 
-            color: white; 
-        }
-
-        .menu-item.active { 
-            border-left: 4px solid var(--accent); 
-            background: rgba(16, 185, 129, 0.1); 
-        }
-
-        /* ÁREA PRINCIPAL */
-        .main-content { 
-            flex: 1; 
-            padding: 40px; 
-            overflow-y: auto; 
-            height: 100vh;
-            background: rgba(0,0,0,0.2); 
-        }
-
+        .main-content { flex: 1; padding: 40px; overflow-y: auto; height: 100vh; background: rgba(0,0,0,0.2); }
         .main-content::-webkit-scrollbar { width: 8px; }
         .main-content::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
         .main-content::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
 
-        .card { 
-            background: var(--glass); 
-            padding: 25px; 
-            border-radius: 20px; 
-            border: 1px solid rgba(255,255,255,0.1); 
-            margin-bottom: 25px; 
-        }
+        .card { background: var(--glass); padding: 25px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 25px; }
 
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-            margin-bottom: 25px;
-        }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 20px; margin-bottom: 25px; }
+        .summary-card { background: var(--glass); padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); }
+        .summary-card span { font-size: 0.85rem; opacity: 0.7; }
+        .summary-card h2 { font-size: 1.8rem; margin-top: 8px; }
 
-        .summary-card {
-            background: var(--glass);
-            padding: 20px;
-            border-radius: 16px;
-            border: 1px solid rgba(255,255,255,0.08);
-        }
-
-        .summary-card span {
-            font-size: 0.85rem;
-            opacity: 0.7;
-        }
-
-        .summary-card h2 {
-            font-size: 1.8rem;
-            margin-top: 8px;
-        }
-
-        /* INPUTS PADRÃO TIPO MENU.HTML */
-        .grid-inputs { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr auto; 
-            gap: 15px; 
-            align-items: flex-end; 
-        }
-
-        input {
-            width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
-            background: rgba(0,0,0,0.3); color: white; outline: none; margin-top: 5px;
-        }
-
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: flex-end; }
+        input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: white; outline: none; margin-top: 5px; color-scheme: dark; }
         button { cursor: pointer; border: none; border-radius: 10px; font-weight: bold; transition: 0.3s; padding: 12px 20px; }
         
-        .btn-calc { background: var(--warning); color: #000; height: 43px;}
-        .btn-calc:hover { opacity: 0.8; }
+        .btn-add { background: var(--primary); color: white; height: 43px;}
+        .btn-pdf { background: #ef4444; color: white; padding: 10px 20px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px;}
+        .btn-pdf:hover { background: #dc2626; }
 
-        /* TABELA */
-        .table-container { 
-            margin-top: 20px; 
-            border-radius: 15px; 
-            overflow: hidden; 
-            background: rgba(0,0,0,0.2); 
-        }
+        .table-container { margin-top: 20px; border-radius: 15px; overflow: hidden; background: rgba(0,0,0,0.2); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: rgba(255,255,255,0.05); padding: 15px; text-align: left; font-size: 0.85rem; color: var(--accent); }
+        td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
+        .delete-btn { background: none; color: var(--danger); font-size: 1.2rem; cursor: pointer; padding: 0;}
 
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-        }
-
-        th { 
-            background: rgba(255,255,255,0.05); 
-            padding: 15px; 
-            text-align: left; 
-            font-size: 0.85rem; 
-            color: var(--accent); 
-        }
-
-        td { 
-            padding: 15px; 
-            border-bottom: 1px solid rgba(255,255,255,0.05); 
-            font-size: 0.9rem; 
-        }
-
-        .logout-btn { 
-            margin-top: auto; 
-            background: var(--danger); 
-            color: white; 
-            padding: 12px; 
-            border: none;
-            border-radius: 10px; 
-            font-weight: bold; 
-            cursor: pointer; 
-            opacity: 0.8;
-            transition: 0.3s;
-        }
-
+        .logout-btn { margin-top: auto; background: var(--danger); color: white; padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; opacity: 0.8; }
         .logout-btn:hover { opacity: 1; }
+
+        .pdf-header { display: none; text-align: center; margin-bottom: 20px; color: #1e1b4b; }
+        .pdf-mode { background: white !important; color: #1e1b4b !important; padding: 40px !important; }
+        .pdf-mode * { color: #1e1b4b !important; border-color: #e5e7eb !important; }
+        .pdf-mode .pdf-header { display: block; }
     </style>
 </head>
 <body>
@@ -189,21 +70,23 @@
     <nav class="sidebar">
         <h2>Gestão Pro</h2>
         <a href="menu.html" class="menu-item">🏠 Painel Geral</a>
+        <a href="menu.html" class="menu-item">⚡ Minha Residência</a>
         <a href="historico.html" class="menu-item active">📊 Histórico & Auditoria</a>
+        <a href="menu.html" class="menu-item">⚙️ Configurações</a>
         <button class="logout-btn" onclick="handleLogout()">Sair do Sistema</button>
     </nav>
 
     <main class="main-content">
-        <h1>Histórico & Auditoria de Consumo</h1>
+        <h1>Histórico Mensal e Auditoria</h1>
 
-        <!-- RESUMO DOS TOTAIS -->
+        <!-- RESUMO DOS TOTAIS DA CASA -->
         <div class="summary-grid">
             <div class="summary-card">
                 <span>Total de Itens</span>
                 <h2 id="total-itens" style="color: var(--real);">0</h2>
             </div>
             <div class="summary-card">
-                <span>Consumo Total Mensal</span>
+                <span>Consumo Total Simulado</span>
                 <h2 id="total-kwh" style="color: var(--accent);">0.00 kWh</h2>
             </div>
             <div class="summary-card">
@@ -212,25 +95,68 @@
             </div>
         </div>
 
-        <!-- SIMULADOR SOLAR COM DADOS REAIS -->
-        <div class="card" style="border-left: 5px solid var(--warning);">
-            <h3 style="color: var(--warning); margin-bottom: 5px;">⚡ Simulador Solar: Conta de Luz Real</h3>
-            <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 20px;">Insira os dados da sua fatura atual para estimar o seu projeto fotovoltaico (base: Carapicuíba/SP).</p>
+        <!-- LISTA DE FATURAS REAIS MÊS A MÊS -->
+        <div class="card" style="border-left: 5px solid var(--real);">
+            <h3 style="color: var(--real); margin-bottom: 15px;">📄 Histórico de Faturas Reais</h3>
+            <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 20px;">Registe as suas contas de luz mensais para calcular a média de consumo com precisão.</p>
             
             <div class="grid-inputs">
                 <div>
-                    <label style="font-size: 0.85rem; opacity: 0.8;">Consumo Mensal na Fatura (kWh)</label>
-                    <input type="number" id="inp-real-kwh" placeholder="Ex: 350">
+                    <label style="font-size: 0.85rem; opacity: 0.8;">Mês/Ano</label>
+                    <input type="month" id="inp-mes">
                 </div>
                 <div>
-                    <label style="font-size: 0.85rem; opacity: 0.8;">Valor Total Pago (R$)</label>
-                    <input type="number" id="inp-real-valor" placeholder="Ex: 320.00" step="0.01">
+                    <label style="font-size: 0.85rem; opacity: 0.8;">Consumo (kWh)</label>
+                    <input type="number" id="inp-kwh" placeholder="Ex: 350">
                 </div>
-                <button class="btn-calc" onclick="calcularSolar()">Calcular Projeto</button>
+                <div>
+                    <label style="font-size: 0.85rem; opacity: 0.8;">Valor Total (R$)</label>
+                    <input type="number" id="inp-valor" placeholder="Ex: 320.00" step="0.01">
+                </div>
+                <button class="btn-add" onclick="adicionarFatura()">Guardar</button>
             </div>
 
-            <!-- RESULTADOS DO SIMULADOR -->
-            <div id="resultado-solar" style="display: none; margin-top: 25px; padding-top: 25px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mês de Referência</th>
+                            <th>Consumo Faturado (kWh)</th>
+                            <th>Valor Pago (R$)</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-faturas">
+                        <tr><td colspan="4" style="text-align: center; opacity: 0.6;">A carregar histórico...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SIMULADOR SOLAR BASEADO NA LISTA ACIMA -->
+        <div class="card" id="area-projeto-solar" style="border-left: 5px solid var(--warning); position: relative;">
+            
+            <button class="btn-pdf" onclick="exportarProjetoPDF()" style="position: absolute; top: 20px; right: 25px;">
+                📄 Exportar Projeto PDF
+            </button>
+
+            <div id="conteudo-pdf">
+                <div class="pdf-header">
+                    <h2>Proposta de Dimensionamento Fotovoltaico</h2>
+                    <p>Estimativa de Geração e Retorno de Investimento (Base: Carapicuíba/SP)</p>
+                    <hr style="margin-top: 15px; border-color: #e5e7eb;">
+                </div>
+
+                <h3 style="color: var(--warning); margin-bottom: 5px;">⚡ Projeto Solar Baseado no Histórico Real</h3>
+                
+                <div style="background: rgba(0,0,0,0.1); padding: 15px; border-radius: 10px; margin-top: 15px; margin-bottom: 25px; border: 1px dashed rgba(255,255,255,0.2);">
+                    <p style="font-size: 0.95rem;">
+                        <strong>Média de Consumo:</strong> <span id="media-kwh">0</span> kWh/mês<br>
+                        <strong>Média de Gasto:</strong> R$ <span id="media-valor">0.00</span>/mês<br>
+                        <span style="font-size: 0.8rem; opacity: 0.7;">* Calculado com base na sua lista de faturas reais.</span>
+                    </p>
+                </div>
+                
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
                     <div>
                         <span style="font-size: 0.8rem; opacity: 0.7;">Placas Solares (550W)</span>
@@ -243,25 +169,23 @@
                     <div>
                         <span style="font-size: 0.8rem; opacity: 0.7;">Investimento Estimado</span>
                         <h3 id="out-invest" style="color: var(--warning); font-size: 1.8rem;">R$ 0</h3>
-                        <span style="font-size: 0.7rem; opacity: 0.6;">(Padrão Gradiente Solar)</span>
                     </div>
                     <div>
-                        <span style="font-size: 0.8rem; opacity: 0.7;">Tempo de Retorno (Payback)</span>
+                        <span style="font-size: 0.8rem; opacity: 0.7;">Tempo de Retorno</span>
                         <h3 id="out-payback" style="color: var(--real); font-size: 1.8rem;">0 anos</h3>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- GRÁFICO DE BARRAS -->
+        <!-- GRÁFICO E AUDITORIA DE EQUIPAMENTOS -->
         <div class="card">
-            <h3>Distribuição de Consumo por Equipamento (kWh/mês)</h3>
+            <h3>Distribuição de Consumo por Equipamento (Simulador)</h3>
             <div style="margin-top: 20px; position: relative; height: 320px;">
                 <canvas id="chartConsumo"></canvas>
             </div>
         </div>
-
-        <!-- TABELA DE AUDITORIA -->
+        
         <div class="card">
             <h3>Relatório Detalhado de Aparelhos</h3>
             <div class="table-container">
@@ -269,18 +193,16 @@
                     <thead>
                         <tr>
                             <th>Equipamento</th>
-                            <th>Potência Unitária</th>
-                            <th>Quantidade</th>
+                            <th>Potência</th>
+                            <th>Qtd</th>
                             <th>Uso Diário</th>
                             <th>Dias/Mês</th>
-                            <th>Consumo Mensal</th>
-                            <th>Custo Mensal</th>
+                            <th>Consumo</th>
+                            <th>Custo</th>
                         </tr>
                     </thead>
-                    <tbody id="tabela-corpo">
-                        <tr>
-                            <td colspan="7" style="text-align: center; opacity: 0.6;">A carregar dados...</td>
-                        </tr>
+                    <tbody id="tabela-equipamentos">
+                        <tr><td colspan="7" style="text-align: center; opacity: 0.6;">A carregar dados...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -288,171 +210,151 @@
     </main>
 
     <script>
-        // CONFIGURAÇÕES DO SUPABASE
         const SUPABASE_URL = "https://srwhournhfadlwbixkxt.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyd2hvdXJuaGZhZGx3Yml4a3h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDMwNTIsImV4cCI6MjA5MDAxOTA1Mn0.HRt-0Rs9-FQxnywBlgOwnP7PO0ea7W7F26Zqlz-whow";
         const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let chartInstancia = null;
+        let userId = null;
 
-        // VERIFICA SESSÃO DO UTILIZADOR
         async function checkAuth() {
             const { data: { session } } = await client.auth.getSession();
             if (!session) {
                 window.location.href = "index.html";
                 return;
             }
-            carregarHistorico();
+            userId = session.user.id;
+            carregarFaturas();
+            carregarEquipamentos();
         }
 
-        // CARREGA E PROCESSA OS DADOS DA BASE DE DADOS
-        async function carregarHistorico() {
-            const tarifaBase = parseFloat(localStorage.getItem('tarifa_energia')) || 0.92;
-            const tarifaAdicional = parseFloat(localStorage.getItem('adicional_bandeira')) || 0;
-            const tarifaFinal = tarifaBase + tarifaAdicional;
+        async function adicionarFatura() {
+            const mes = document.getElementById("inp-mes").value;
+            const kwh = parseFloat(document.getElementById("inp-kwh").value);
+            const valor = parseFloat(document.getElementById("inp-valor").value);
 
-            const { data, error } = await client.from('equipamentos').select('*');
+            if (!mes || isNaN(kwh) || isNaN(valor)) {
+                return alert("Preencha o mês, consumo e valor corretamente!");
+            }
+
+            const { error } = await client.from('faturas_reais').insert([{
+                user_id: userId, mes_referencia: mes, consumo_kwh: kwh, valor_pago: valor
+            }]);
 
             if (error) {
-                console.error("Erro ao procurar dados no Supabase:", error);
-                alert("Ocorreu um erro ao carregar os registos.");
-                return;
+                alert("Erro ao guardar: " + error.message);
+            } else {
+                document.getElementById("inp-mes").value = "";
+                document.getElementById("inp-kwh").value = "";
+                document.getElementById("inp-valor").value = "";
+                carregarFaturas();
             }
+        }
 
-            let consumoTotalGeral = 0;
-            const labels = [];
-            const valoresKwh = [];
-            const tbody = document.getElementById("tabela-corpo");
+        async function carregarFaturas() {
+            const { data, error } = await client.from('faturas_reais').select('*').order('mes_referencia', { ascending: false });
+            const tbody = document.getElementById("tabela-faturas");
             tbody.innerHTML = "";
 
+            if (error) return console.error(error);
+
             if (!data || data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; opacity: 0.6;">Nenhum equipamento registado até ao momento.</td></tr>`;
-                document.getElementById("total-itens").innerText = "0";
-                document.getElementById("total-kwh").innerText = "0.00 kWh";
-                document.getElementById("total-custo").innerText = "R$ 0,00";
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; opacity: 0.6;">Nenhuma fatura registada.</td></tr>`;
+                calcularProjetoSolar(0, 0);
                 return;
             }
 
-            data.forEach(item => {
-                const consumoMensal = (item.watts * item.qtd * item.horas * item.dias) / 1000;
-                const custoMensal = consumoMensal * tarifaFinal;
-                consumoTotalGeral += consumoMensal;
+            let somaKwh = 0, somaValor = 0;
+            const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-                labels.push(item.nome);
-                valoresKwh.push(consumoMensal.toFixed(2));
+            data.forEach(fat => {
+                somaKwh += fat.consumo_kwh;
+                somaValor += fat.valor_pago;
 
-                const horasInt = Math.floor(item.horas);
-                const minutosInt = Math.round((item.horas % 1) * 60);
+                const partes = fat.mes_referencia.split('-');
+                const mesEscrito = `${nomesMeses[parseInt(partes[1])-1]}/${partes[0]}`;
 
                 tbody.innerHTML += `
                     <tr>
-                        <td><strong>${item.nome}</strong></td>
-                        <td>${item.watts} W</td>
-                        <td>${item.qtd}</td>
-                        <td>${horasInt}h ${minutosInt}m</td>
-                        <td>${item.dias} dias</td>
-                        <td>${consumoMensal.toFixed(2)} kWh</td>
-                        <td style="color: var(--accent); font-weight: bold;">R$ ${custoMensal.toFixed(2)}</td>
-                    </tr>
-                `;
+                        <td><strong>${mesEscrito}</strong></td>
+                        <td>${fat.consumo_kwh.toFixed(2)} kWh</td>
+                        <td>R$ ${fat.valor_pago.toFixed(2)}</td>
+                        <td><button class="delete-btn" onclick="apagarFatura('${fat.id}')">🗑️</button></td>
+                    </tr>`;
             });
 
-            // Atualiza os cartões superiores
-            document.getElementById("total-itens").innerText = data.length;
-            document.getElementById("total-kwh").innerText = `${consumoTotalGeral.toFixed(2)} kWh`;
-            document.getElementById("total-custo").innerText = (consumoTotalGeral * tarifaFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-            renderizarGrafico(labels, valoresKwh);
+            calcularProjetoSolar(somaKwh / data.length, somaValor / data.length);
         }
 
-        // CÁLCULO DO SIMULADOR SOLAR
-        function calcularSolar() {
-            const kwhReal = parseFloat(document.getElementById('inp-real-kwh').value);
-            const valorReal = parseFloat(document.getElementById('inp-real-valor').value);
-
-            if (isNaN(kwhReal) || isNaN(valorReal) || kwhReal <= 0 || valorReal <= 0) {
-                alert("Por favor, preencha o consumo e o valor com números válidos.");
-                return;
+        async function apagarFatura(id) {
+            if (confirm("Apagar esta fatura?")) {
+                await client.from('faturas_reais').delete().eq('id', id);
+                carregarFaturas();
             }
+        }
 
-            // Constantes baseadas na região Sudeste / SP
-            const HORAS_SOL_PLENO = 4.5; // Média diária de HSP 
-            const POTENCIA_PLACA = 550; // Watts (placa padrão de mercado)
-            const EFICIENCIA = 0.80; // Perdas do sistema (80% eficiência)
-            const PRECO_KWP = 3800; // Preço médio por kWp instalado no Brasil (R$)
-            const AREA_POR_PLACA = 2.6; // m² necessários por placa (incluindo espaçamento)
+        function calcularProjetoSolar(mediaKwh, mediaValor) {
+            document.getElementById('media-kwh').innerText = mediaKwh.toFixed(1);
+            document.getElementById('media-valor').innerText = mediaValor.toFixed(2);
 
-            // Geração mensal de 1 placa (kWh)
-            const geracaoPlacaMes = (POTENCIA_PLACA * HORAS_SOL_PLENO * EFICIENCIA * 30) / 1000;
+            if (mediaKwh <= 0) return;
 
-            // Cálculos
-            const qtdPlacas = Math.ceil(kwhReal / geracaoPlacaMes);
-            const potenciaTotalKwp = (qtdPlacas * POTENCIA_PLACA) / 1000;
-            const areaOcupada = qtdPlacas * AREA_POR_PLACA;
-            const investimentoTotal = potenciaTotalKwp * PRECO_KWP;
+            const HORAS_SOL = 4.5, POTENCIA = 550, EFICIENCIA = 0.80, PRECO_KWP = 3800, AREA = 2.6;
+            const geracaoPlacaMes = (POTENCIA * HORAS_SOL * EFICIENCIA * 30) / 1000;
+            const qtdPlacas = Math.ceil(mediaKwh / geracaoPlacaMes);
+            const investimento = ((qtdPlacas * POTENCIA) / 1000) * PRECO_KWP;
 
-            // Retorno sobre investimento (Payback)
-            const mesesPayback = investimentoTotal / valorReal;
-            const anosPayback = mesesPayback / 12;
-
-            // Atualiza a interface
             document.getElementById('out-placas').innerText = `${qtdPlacas} un`;
-            document.getElementById('out-area').innerText = `${areaOcupada.toFixed(1)} m²`;
-            document.getElementById('out-invest').innerText = investimentoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            document.getElementById('out-payback').innerText = `${anosPayback.toFixed(1)} anos`;
-
-            // Mostra o resultado com uma animação leve
-            const resultDiv = document.getElementById('resultado-solar');
-            resultDiv.style.display = "block";
-            resultDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            document.getElementById('out-area').innerText = `${(qtdPlacas * AREA).toFixed(1)} m²`;
+            document.getElementById('out-invest').innerText = investimento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            document.getElementById('out-payback').innerText = `${((investimento / mediaValor) / 12).toFixed(1)} anos`;
         }
 
-        // GERA O GRÁFICO COM CHART.JS
-        function renderizarGrafico(labels, valores) {
-            const ctx = document.getElementById('chartConsumo').getContext('2d');
+        function exportarProjetoPDF() {
+            const el = document.getElementById('conteudo-pdf');
+            el.classList.add('pdf-mode');
+            html2pdf().set({
+                margin: 15, filename: 'Estimativa_Projeto_Solar.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(el).save().then(() => el.classList.remove('pdf-mode'));
+        }
 
-            if (chartInstancia) {
-                chartInstancia.destroy();
+        async function carregarEquipamentos() {
+            const tarifaFinal = (parseFloat(localStorage.getItem('tarifa_energia')) || 0.92) + (parseFloat(localStorage.getItem('adicional_bandeira')) || 0);
+            const { data, error } = await client.from('equipamentos').select('*');
+            
+            const tbody = document.getElementById("tabela-equipamentos");
+            tbody.innerHTML = "";
+            let totalKwh = 0, labels = [], valoresKwh = [];
+
+            if (data) {
+                data.forEach(item => {
+                    const consumo = (item.watts * item.qtd * item.horas * item.dias) / 1000;
+                    totalKwh += consumo;
+                    labels.push(item.nome);
+                    valoresKwh.push(consumo.toFixed(2));
+
+                    tbody.innerHTML += `<tr>
+                        <td>${item.nome}</td><td>${item.watts}W</td><td>${item.qtd}</td>
+                        <td>${Math.floor(item.horas)}h ${Math.round((item.horas % 1) * 60)}m</td>
+                        <td>${item.dias} dias</td><td>${consumo.toFixed(2)} kWh</td>
+                        <td style="color:var(--accent);">R$ ${(consumo * tarifaFinal).toFixed(2)}</td>
+                    </tr>`;
+                });
             }
 
-            chartInstancia = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Consumo Mensal (kWh)',
-                        data: valores,
-                        backgroundColor: '#10b981',
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { color: 'rgba(255,255,255,0.7)' },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
-                        },
-                        x: {
-                            ticks: { color: 'rgba(255,255,255,0.7)' },
-                            grid: { display: false }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            labels: { color: '#ffffff' }
-                        }
-                    }
-                }
-            });
-        }
+            document.getElementById("total-itens").innerText = data ? data.length : 0;
+            document.getElementById("total-kwh").innerText = `${totalKwh.toFixed(2)} kWh`;
+            document.getElementById("total-custo").innerText = (totalKwh * tarifaFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-        // TERMINAR SESSÃO
-        async function handleLogout() {
-            await client.auth.signOut();
-            window.location.href = "index.html";
+            if (chartInstancia) chartInstancia.destroy();
+            chartInstancia = new Chart(document.getElementById('chartConsumo').getContext('2d'), {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Consumo (kWh)', data: valoresKwh, backgroundColor: '#10b981', borderRadius: 6 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: 'rgba(255,255,255,0.7)' } }, x: { ticks: { color: 'rgba(255,255,255,0.7)' } } }, plugins: { legend: { labels: { color: '#ffffff' } } } }
+            });
         }
 
         window.onload = checkAuth;
