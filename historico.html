@@ -123,6 +123,24 @@
             margin-top: 8px;
         }
 
+        /* INPUTS PADRÃO TIPO MENU.HTML */
+        .grid-inputs { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr auto; 
+            gap: 15px; 
+            align-items: flex-end; 
+        }
+
+        input {
+            width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.3); color: white; outline: none; margin-top: 5px;
+        }
+
+        button { cursor: pointer; border: none; border-radius: 10px; font-weight: bold; transition: 0.3s; padding: 12px 20px; }
+        
+        .btn-calc { background: var(--warning); color: #000; height: 43px;}
+        .btn-calc:hover { opacity: 0.8; }
+
         /* TABELA */
         .table-container { 
             margin-top: 20px; 
@@ -163,9 +181,7 @@
             transition: 0.3s;
         }
 
-        .logout-btn:hover {
-            opacity: 1;
-        }
+        .logout-btn:hover { opacity: 1; }
     </style>
 </head>
 <body>
@@ -193,6 +209,47 @@
             <div class="summary-card">
                 <span>Custo Total Estimado</span>
                 <h2 id="total-custo" style="color: var(--warning);">R$ 0,00</h2>
+            </div>
+        </div>
+
+        <!-- SIMULADOR SOLAR COM DADOS REAIS -->
+        <div class="card" style="border-left: 5px solid var(--warning);">
+            <h3 style="color: var(--warning); margin-bottom: 5px;">⚡ Simulador Solar: Conta de Luz Real</h3>
+            <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 20px;">Insira os dados da sua fatura atual para estimar o seu projeto fotovoltaico (base: Carapicuíba/SP).</p>
+            
+            <div class="grid-inputs">
+                <div>
+                    <label style="font-size: 0.85rem; opacity: 0.8;">Consumo Mensal na Fatura (kWh)</label>
+                    <input type="number" id="inp-real-kwh" placeholder="Ex: 350">
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; opacity: 0.8;">Valor Total Pago (R$)</label>
+                    <input type="number" id="inp-real-valor" placeholder="Ex: 320.00" step="0.01">
+                </div>
+                <button class="btn-calc" onclick="calcularSolar()">Calcular Projeto</button>
+            </div>
+
+            <!-- RESULTADOS DO SIMULADOR -->
+            <div id="resultado-solar" style="display: none; margin-top: 25px; padding-top: 25px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+                    <div>
+                        <span style="font-size: 0.8rem; opacity: 0.7;">Placas Solares (550W)</span>
+                        <h3 id="out-placas" style="color: var(--accent); font-size: 1.8rem;">0 un</h3>
+                    </div>
+                    <div>
+                        <span style="font-size: 0.8rem; opacity: 0.7;">Espaço Necessário</span>
+                        <h3 id="out-area" style="color: var(--accent); font-size: 1.8rem;">0 m²</h3>
+                    </div>
+                    <div>
+                        <span style="font-size: 0.8rem; opacity: 0.7;">Investimento Estimado</span>
+                        <h3 id="out-invest" style="color: var(--warning); font-size: 1.8rem;">R$ 0</h3>
+                        <span style="font-size: 0.7rem; opacity: 0.6;">(Padrão Gradiente Solar)</span>
+                    </div>
+                    <div>
+                        <span style="font-size: 0.8rem; opacity: 0.7;">Tempo de Retorno (Payback)</span>
+                        <h3 id="out-payback" style="color: var(--real); font-size: 1.8rem;">0 anos</h3>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -306,6 +363,48 @@
             document.getElementById("total-custo").innerText = (consumoTotalGeral * tarifaFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
             renderizarGrafico(labels, valoresKwh);
+        }
+
+        // CÁLCULO DO SIMULADOR SOLAR
+        function calcularSolar() {
+            const kwhReal = parseFloat(document.getElementById('inp-real-kwh').value);
+            const valorReal = parseFloat(document.getElementById('inp-real-valor').value);
+
+            if (isNaN(kwhReal) || isNaN(valorReal) || kwhReal <= 0 || valorReal <= 0) {
+                alert("Por favor, preencha o consumo e o valor com números válidos.");
+                return;
+            }
+
+            // Constantes baseadas na região Sudeste / SP
+            const HORAS_SOL_PLENO = 4.5; // Média diária de HSP 
+            const POTENCIA_PLACA = 550; // Watts (placa padrão de mercado)
+            const EFICIENCIA = 0.80; // Perdas do sistema (80% eficiência)
+            const PRECO_KWP = 3800; // Preço médio por kWp instalado no Brasil (R$)
+            const AREA_POR_PLACA = 2.6; // m² necessários por placa (incluindo espaçamento)
+
+            // Geração mensal de 1 placa (kWh)
+            const geracaoPlacaMes = (POTENCIA_PLACA * HORAS_SOL_PLENO * EFICIENCIA * 30) / 1000;
+
+            // Cálculos
+            const qtdPlacas = Math.ceil(kwhReal / geracaoPlacaMes);
+            const potenciaTotalKwp = (qtdPlacas * POTENCIA_PLACA) / 1000;
+            const areaOcupada = qtdPlacas * AREA_POR_PLACA;
+            const investimentoTotal = potenciaTotalKwp * PRECO_KWP;
+
+            // Retorno sobre investimento (Payback)
+            const mesesPayback = investimentoTotal / valorReal;
+            const anosPayback = mesesPayback / 12;
+
+            // Atualiza a interface
+            document.getElementById('out-placas').innerText = `${qtdPlacas} un`;
+            document.getElementById('out-area').innerText = `${areaOcupada.toFixed(1)} m²`;
+            document.getElementById('out-invest').innerText = investimentoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            document.getElementById('out-payback').innerText = `${anosPayback.toFixed(1)} anos`;
+
+            // Mostra o resultado com uma animação leve
+            const resultDiv = document.getElementById('resultado-solar');
+            resultDiv.style.display = "block";
+            resultDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         // GERA O GRÁFICO COM CHART.JS
